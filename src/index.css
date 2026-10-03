@@ -1,0 +1,95 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --tp-blue-primary: #0066FF;
+  --tp-blue-dark: #0A1128;
+  --tp-blue-midnight: #050B14;
+  --tp-lime: #CCFF00;
+  --tp-lime-dark: #A6D900;
+  --tp-surface: #101827;
+  --tp-surface-card: #182234;
+  --tp-border: #23334d;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--tp-blue-midnight);
+  color: #F3F4F6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom leaflet map adjustments */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #0f172a;
+}
+
+/* Dark mode map tiles invert filter for high-tech night look */
+.tech-tile-filter .leaflet-tile {
+  filter: brightness(0.85) contrast(1.15) saturate(1.1);
+}
+
+/* Custom vehicle marker animations */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+/* Wind trail animation */
+@keyframes wind-particles {
+  0% {
+    opacity: 0.8;
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: translateY(12px) scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.3);
+  }
+}
+
+.wind-particle {
+  animation: wind-particles 1.2s ease-out infinite;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A1128;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #23334d;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0066FF;
+}
