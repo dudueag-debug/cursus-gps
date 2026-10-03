@@ -880,10 +880,12 @@ app.get('/api/safety-checklist', (req: Request, res: Response) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`[TÔ PASSANDO API] Servidor rodando na porta ${PORT}`);
-  console.log(`[CURSUS GPS] Pronto para atender o Brasil.`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`[TÔ PASSANDO API] Servidor rodando na porta ${PORT}`);
+    console.log(`[CURSUS GPS] Pronto para atender o Brasil.`);
+  });
+}
 
 export default app;
 
