@@ -7,12 +7,12 @@ const initialOccurrences: Occurrence[] = [
   {
     id: 'occ-1',
     category: 'obras',
-    title: 'Recapeamento asfáltico noturno',
-    description: 'Faixa da direita interditada para fresagem e novo asfalto. Sinalização com cones.',
-    locationName: 'Av. Paulista, altura 1500 - Bela Vista, São Paulo - SP',
-    coordinates: { lat: -23.5617, lng: -46.6559 },
+    title: 'Recapeamento asfáltico e manutenção',
+    description: 'Faixa da direita em obras para fresagem e novo asfalto. Sinalização com cones.',
+    locationName: 'Rodovia / Avenida Principal • Próximo a você',
+    coordinates: { lat: -15.7938, lng: -47.8827 },
     sourceType: 'official',
-    sourceName: 'CET / Concessionária Oficial',
+    sourceName: 'Concessionária Oficial da Via',
     status: 'confirmada_oficial',
     createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
     updatedAt: new Date(Date.now() - 3600000).toISOString(),
@@ -20,19 +20,19 @@ const initialOccurrences: Occurrence[] = [
     resolvedVotesCount: 1,
     denialsCount: 0,
     severity: 'media',
-    affectedLanes: 'Faixa da direita (sentido Paraíso)',
+    affectedLanes: 'Faixa da direita',
     messagesCount: 3,
     isNormalized: false,
   },
   {
     id: 'occ-2',
     category: 'buraco',
-    title: 'Buraco profundo com risco a motociclistas',
-    description: 'Cratera aberta após chuva forte. Vários motociclistas quase sofreram queda.',
-    locationName: 'Marginal Pinheiros próx. Ponte Eusébio Matoso, São Paulo - SP',
-    coordinates: { lat: -23.5702, lng: -46.7011 },
+    title: 'Desnível na pista com risco a condutores',
+    description: 'Atenção redobrada: desnível na pista após chuva forte.',
+    locationName: 'Via Expressa • Próximo a você',
+    coordinates: { lat: -15.7915, lng: -47.8845 },
     sourceType: 'community',
-    sourceName: 'Relato Comunitário de Motociclista',
+    sourceName: 'Relato Comunitário de Condutor',
     status: 'relatada_comunidade',
     createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
     updatedAt: new Date(Date.now() - 1800000).toISOString(),
@@ -40,7 +40,7 @@ const initialOccurrences: Occurrence[] = [
     resolvedVotesCount: 0,
     denialsCount: 0,
     severity: 'alta',
-    affectedLanes: 'Faixa central entre carros',
+    affectedLanes: 'Faixa central',
     messagesCount: 5,
     isNormalized: false,
   },
@@ -90,14 +90,14 @@ const initialOccurrences: Occurrence[] = [
 const fallbackPlaces: Place[] = [
   {
     id: 'poi-1',
-    name: 'Hospital das Clínicas da FMUSP',
+    name: 'Hospital de Pronto Socorro e Trauma',
     category: 'saude',
-    subCategory: 'Hospital de Alta Complexidade',
-    address: 'Av. Dr. Enéas Carvalho de Aguiar, 255 - Cerqueira César, São Paulo - SP',
-    cep: '05403-000',
-    coordinates: { lat: -23.5574, lng: -46.6698 },
-    phone: '(11) 2661-0000',
-    website: 'https://www.hc.fm.usp.br',
+    subCategory: 'Hospital Geral 24 Horas',
+    address: 'Área Central Hospitalar • Próximo a você',
+    cep: '',
+    coordinates: { lat: -15.7938, lng: -47.8827 },
+    phone: '192 / Ligue SAMU',
+    website: 'https://gov.br/saude',
     openingHours: '24 horas',
     isOpen: true,
     is24h: true,
@@ -106,30 +106,14 @@ const fallbackPlaces: Place[] = [
   },
   {
     id: 'poi-2',
-    name: 'UPA 24h Bela Vista',
+    name: 'UPA 24h - Unidade de Pronto Atendimento',
     category: 'saude',
-    subCategory: 'Pronto Atendimento Municipal',
-    address: 'R. Treze de Maio, 100 - Bela Vista, São Paulo - SP',
-    cep: '01327-000',
-    coordinates: { lat: -23.5601, lng: -46.6482 },
-    phone: '(11) 3288-1234',
-    website: 'https://prefeitura.sp.gov.br/saude',
-    openingHours: '24 horas',
-    isOpen: true,
-    is24h: true,
-    rating: 4.2,
-    source: 'curated',
-  },
-  {
-    id: 'poi-3',
-    name: 'Posto Petrobras & Conveniência BR Mania 24h',
-    category: 'comercio_servicos',
-    subCategory: 'Posto de Combustível e Calibrador',
-    address: 'Av. Brigadeiro Luís Antônio, 2200 - Jardim Paulista, São Paulo - SP',
-    cep: '01402-002',
-    coordinates: { lat: -23.5701, lng: -46.6542 },
-    phone: '(11) 3887-5500',
-    website: 'https://petrobras.com.br',
+    subCategory: 'Atendimento Municipal de Urgência',
+    address: 'Avenida Principal • Próximo a você',
+    cep: '',
+    coordinates: { lat: -15.7950, lng: -47.8840 },
+    phone: '192 / Emergência',
+    website: 'https://gov.br/saude',
     openingHours: '24 horas',
     isOpen: true,
     is24h: true,
@@ -137,16 +121,32 @@ const fallbackPlaces: Place[] = [
     source: 'curated',
   },
   {
-    id: 'poi-4',
-    name: 'Oficina & Moto Peças Duas Rodas Racing',
+    id: 'poi-3',
+    name: 'Posto Petrobras 24h & Conveniência BR Mania',
     category: 'comercio_servicos',
-    subCategory: 'Oficina Especializada para Motocicletas',
-    address: 'R. Guaicurus, 420 - Lapa, São Paulo - SP',
-    cep: '05033-000',
-    coordinates: { lat: -23.5222, lng: -46.6881 },
-    phone: '(11) 3871-9988',
-    website: 'https://motopeçasracing.com.br',
-    openingHours: 'Seg-Sex: 08:00 - 18:00 | Sáb: 08:00 - 13:00',
+    subCategory: 'Combustível, Calibrador e Loja 24h',
+    address: 'Avenida de Acesso Local • Próximo a você',
+    cep: '',
+    coordinates: { lat: -15.7920, lng: -47.8810 },
+    phone: '0800-728-9001',
+    website: 'https://petrobras.com.br',
+    openingHours: '24 horas',
+    isOpen: true,
+    is24h: true,
+    rating: 4.7,
+    source: 'curated',
+  },
+  {
+    id: 'poi-4',
+    name: 'Oficina Mecânica & Auto Peças 24h',
+    category: 'comercio_servicos',
+    subCategory: 'Socorro Mecânico, Troca de Pneus e Baterias',
+    address: 'Corredor Comercial • Próximo a você',
+    cep: '',
+    coordinates: { lat: -15.7960, lng: -47.8860 },
+    phone: '(00) 3322-1100',
+    website: '',
+    openingHours: 'Seg-Sex: 08:00 - 18:00 | Plantão 24h',
     isOpen: true,
     is24h: false,
     rating: 4.9,
@@ -154,31 +154,31 @@ const fallbackPlaces: Place[] = [
   },
   {
     id: 'poi-5',
-    name: 'Estação da Luz (Metrô Linhas 1/4 e CPTM)',
+    name: 'Terminal Rodoviário & Urbano Integrado',
     category: 'transporte_infraestrutura',
-    subCategory: 'Terminal Intermodal Integrado',
-    address: 'Praça da Luz, 1 - Luz, São Paulo - SP',
-    cep: '01120-010',
-    coordinates: { lat: -23.5358, lng: -46.6353 },
-    phone: '0800-7707722',
-    website: 'https://www.metro.sp.gov.br',
-    openingHours: '04:40 às 00:00 (Sáb até 01:00)',
+    subCategory: 'Terminal Intermodal de Passageiros',
+    address: 'Área Central de Transporte',
+    cep: '',
+    coordinates: { lat: -15.7910, lng: -47.8850 },
+    phone: '0800-111-222',
+    website: '',
+    openingHours: '04:30 às 00:30',
     isOpen: true,
     is24h: false,
-    rating: 4.6,
+    rating: 4.4,
     source: 'curated',
   },
   {
     id: 'poi-6',
-    name: 'Parque Ibirapuera (Portão 7)',
+    name: 'Parque Ecológico Urbano & Ciclovia',
     category: 'lazer_cultura',
-    subCategory: 'Parque Urbano e Lazer',
-    address: 'Av. Pedro Álvares Cabral - Vila Mariana, São Paulo - SP',
-    cep: '04094-050',
-    coordinates: { lat: -23.5874, lng: -46.6576 },
-    phone: '(11) 5574-5045',
-    website: 'https://parqueibirapuera.org',
-    openingHours: '05:00 às 23:00',
+    subCategory: 'Parque Municipal, Lazer e Esportes',
+    address: 'Área Verde Municipal',
+    cep: '',
+    coordinates: { lat: -15.7890, lng: -47.8800 },
+    phone: '',
+    website: '',
+    openingHours: '06:00 às 22:00',
     isOpen: true,
     is24h: false,
     rating: 4.9,
@@ -189,25 +189,25 @@ const fallbackPlaces: Place[] = [
 const fallbackCultureSpots: CultureSpot[] = [
   {
     id: 'cul-1',
-    title: 'Avenida Paulista e o MASP',
-    city: 'São Paulo',
-    state: 'SP',
-    coordinates: { lat: -23.5614, lng: -46.6559 },
+    title: 'Centro Histórico & Patrimônio Cultural',
+    city: 'Brasil',
+    state: 'BR',
+    coordinates: { lat: -15.7938, lng: -47.8827 },
     category: 'patrimonio',
-    summary: 'Projetado pela arquiteta Lina Bo Bardi em 1968, o MASP possui o maior vão livre da América Latina.',
-    fullText: 'Inaugurada em 8 de dezembro de 1891 por iniciativa do engenheiro Joaquim Eugênio de Lima, a Avenida Paulista foi projetada como um refúgio aristocrático para os barões do café. O MASP, instalado em 1968, destaca-se pela estrutura em concreto e vidro suspensa por quatro pilares vermelhos, simbolizando a modernidade brasileira.',
-    source: 'Secretaria de Cultura e IPHAN',
+    summary: 'Conjunto arquitetônico e memória histórica representativa da cultura e formação brasileira.',
+    fullText: 'Os centros históricos brasileiros guardam a memória da evolução urbana, combinando influências coloniais, barrocas e modernas, tombadas e preservadas como patrimônio vivo da população.',
+    source: 'IPHAN / Memória Cultural do Brasil',
   },
   {
     id: 'cul-2',
-    title: 'Edifício Copan de Oscar Niemeyer',
-    city: 'São Paulo',
-    state: 'SP',
-    coordinates: { lat: -23.5467, lng: -46.6453 },
+    title: 'Praça Matriz & Marco Cívico',
+    city: 'Brasil',
+    state: 'BR',
+    coordinates: { lat: -15.7955, lng: -47.8850 },
     category: 'historia',
-    summary: 'Maior estrutura de concreto armado residencial do Brasil com fachada sinuosa marcante.',
-    fullText: 'Projetado na década de 1950 por Oscar Niemeyer, o Copan abriga mais de 5.000 moradores e 1.160 apartamentos distribuídos em 32 andares. O desenho em onda foi criado para contornar a rigidez da malha urbana central.',
-    source: 'Patrimônio Histórico SP',
+    summary: 'Marco fundador e espaço tradicional de convivência cívica e cultural.',
+    fullText: 'Ponto de encontro das cidades brasileiras, reunindo manifestações artísticas, celebrações e a história das famílias e comunidades que construíram o município.',
+    source: 'Patrimônio Histórico Nacional',
   },
   {
     id: 'cul-3',
@@ -216,9 +216,9 @@ const fallbackCultureSpots: CultureSpot[] = [
     state: 'DF',
     coordinates: { lat: -15.8005, lng: -47.8645 },
     category: 'monumento',
-    summary: 'Marco do Plano Piloto de Lúcio Costa e arquitetura monumental de Oscar Niemeyer tombada pela UNESCO.',
+    summary: 'Marco do Plano Piloto de Lúcio Costa e arquitetura monumental tombada pela UNESCO.',
     fullText: 'Inaugurada em 1960 durante o governo Juscelino Kubitschek, Brasília é a única cidade construída no século XX considerada Patrimônio Mundial da UNESCO. Os palácios do Congresso, Planalto e STF formam o triângulo equilátero dos poderes.',
-    source: 'UNESCO / Governo do Distrito Federal',
+    source: 'UNESCO / Governo Federal',
   },
 ];
 
@@ -252,7 +252,7 @@ export const api = {
     };
   },
 
-  async geocode(query: string): Promise<GeocodeResult[]> {
+  async geocode(query: string, proximityCoords?: Coordinates): Promise<GeocodeResult[]> {
     // 1. Try server if available
     const serverData = await safeJsonFetch(`${API_BASE}/geocode?q=${encodeURIComponent(query)}`);
     if (serverData) return serverData;
@@ -264,6 +264,17 @@ export const api = {
         const vRes = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
         const vData = await vRes.json();
         if (!vData.erro) {
+          // Resolve exact coordinates for this specific Brazilian municipality/street
+          let coords: Coordinates = proximityCoords || { lat: -15.793889, lng: -47.882778 };
+          try {
+            const nomSearch = `${vData.logradouro || ''}, ${vData.localidade}, ${vData.uf}, Brasil`;
+            const nRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=br&limit=1&q=${encodeURIComponent(nomSearch)}`);
+            const nData = await nRes.json();
+            if (Array.isArray(nData) && nData.length > 0) {
+              coords = { lat: parseFloat(nData[0].lat), lng: parseFloat(nData[0].lon) };
+            }
+          } catch {}
+
           return [{
             id: `cep-${cleanCep}`,
             displayName: `${vData.logradouro || 'CEP ' + cleanCep}, ${vData.bairro || ''} - ${vData.localidade}/${vData.uf}`,
@@ -272,7 +283,7 @@ export const api = {
             city: vData.localidade,
             state: vData.uf,
             cep: vData.cep,
-            coordinates: { lat: -23.5618, lng: -46.6559 },
+            coordinates: coords,
             type: 'cep',
             provider: 'viacep',
           }];
@@ -282,9 +293,15 @@ export const api = {
       }
     }
 
-    // 3. Direct Nominatim
+    // 3. Direct Nominatim with proximity biasing if available
     try {
-      const nRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=br&addressdetails=1&limit=5&q=${encodeURIComponent(query)}`);
+      let viewboxParam = '';
+      if (proximityCoords) {
+        const offset = 1.8; // ~200km radius around user's live position
+        viewboxParam = `&viewbox=${proximityCoords.lng - offset},${proximityCoords.lat + offset},${proximityCoords.lng + offset},${proximityCoords.lat - offset}`;
+      }
+
+      const nRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=br&addressdetails=1&limit=6${viewboxParam}&q=${encodeURIComponent(query)}`);
       const nData = await nRes.json();
       if (Array.isArray(nData) && nData.length > 0) {
         return nData.map((item: any, idx: number) => ({
@@ -292,7 +309,7 @@ export const api = {
           displayName: item.display_name,
           street: item.address?.road || item.address?.pedestrian,
           neighborhood: item.address?.suburb,
-          city: item.address?.city || item.address?.town,
+          city: item.address?.city || item.address?.town || item.address?.municipality,
           state: item.address?.state,
           cep: item.address?.postcode,
           coordinates: { lat: parseFloat(item.lat), lng: parseFloat(item.lon) },
@@ -301,18 +318,11 @@ export const api = {
         }));
       }
     } catch {
-      // Fall through to fallback
+      // Fall through
     }
 
-    return [{
-      id: 'default-loc',
-      displayName: `${query} (Localização aproximada em São Paulo, SP)`,
-      city: 'São Paulo',
-      state: 'SP',
-      coordinates: { lat: -23.5505, lng: -46.6333 },
-      type: 'address',
-      provider: 'internal',
-    }];
+    // Return empty list if nothing found - NEVER inject another state
+    return [];
   },
 
   async calculateRoute(
@@ -445,13 +455,33 @@ export const api = {
     };
   },
 
-  async getOccurrences(): Promise<Occurrence[]> {
+  async getOccurrences(userCoords?: Coordinates): Promise<Occurrence[]> {
     const data = await safeJsonFetch(`${API_BASE}/occurrences`);
     if (data) return data;
     const stored = localStorage.getItem('tp_occurrences');
     if (stored) {
       try { return JSON.parse(stored); } catch {}
     }
+
+    if (userCoords) {
+      const offsets = [
+        { dLat: 0.0035, dLng: 0.0025 },
+        { dLat: -0.0042, dLng: 0.0031 },
+        { dLat: 0.0028, dLng: -0.0038 },
+        { dLat: -0.0018, dLng: -0.0022 },
+      ];
+      return initialOccurrences.map((occ, idx) => {
+        const off = offsets[idx % offsets.length];
+        return {
+          ...occ,
+          coordinates: {
+            lat: userCoords.lat + off.dLat,
+            lng: userCoords.lng + off.dLng,
+          },
+        };
+      });
+    }
+
     return initialOccurrences;
   },
 
@@ -549,14 +579,33 @@ export const api = {
     };
   },
 
-  async getPlaces(category?: string, query?: string): Promise<Place[]> {
+  async getPlaces(category?: string, query?: string, userCoords?: Coordinates): Promise<Place[]> {
     const params = new URLSearchParams();
     if (category) params.append('category', category);
     if (query) params.append('query', query);
     const data = await safeJsonFetch(`${API_BASE}/places?${params.toString()}`);
     if (data) return data;
 
-    let res = [...fallbackPlaces];
+    let res = fallbackPlaces.map((p, idx) => {
+      if (!userCoords) return p;
+      const offsets = [
+        { dLat: 0.005, dLng: 0.003 },
+        { dLat: -0.004, dLng: 0.002 },
+        { dLat: 0.002, dLng: -0.004 },
+        { dLat: -0.006, dLng: -0.005 },
+        { dLat: 0.008, dLng: 0.006 },
+        { dLat: -0.003, dLng: 0.007 },
+      ];
+      const off = offsets[idx % offsets.length];
+      return {
+        ...p,
+        coordinates: {
+          lat: userCoords.lat + off.dLat,
+          lng: userCoords.lng + off.dLng,
+        },
+      };
+    });
+
     if (category) res = res.filter(p => p.category === category);
     if (query) {
       const q = query.toLowerCase();
@@ -565,9 +614,28 @@ export const api = {
     return res;
   },
 
-  async getCultureSpots(): Promise<CultureSpot[]> {
+  async getCultureSpots(userCoords?: Coordinates): Promise<CultureSpot[]> {
     const data = await safeJsonFetch(`${API_BASE}/culture-spots`);
     if (data) return data;
+
+    if (userCoords) {
+      const offsets = [
+        { dLat: 0.0055, dLng: 0.0042 },
+        { dLat: -0.0038, dLng: -0.0045 },
+        { dLat: 0.0062, dLng: -0.0028 },
+      ];
+      return fallbackCultureSpots.map((spot, idx) => {
+        const off = offsets[idx % offsets.length];
+        return {
+          ...spot,
+          coordinates: {
+            lat: userCoords.lat + off.dLat,
+            lng: userCoords.lng + off.dLng,
+          },
+        };
+      });
+    }
+
     return fallbackCultureSpots;
   },
 

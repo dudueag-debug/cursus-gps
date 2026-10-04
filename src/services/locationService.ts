@@ -23,12 +23,12 @@ export const locationService = {
     // 1. Check if user already had a saved location from previous session
     const cached = localStorage.getItem('tp_user_location');
     let fallbackResult: LocationDetectionResult = {
-      coordinates: { lat: -23.5505, lng: -46.6333 },
-      city: 'São Paulo',
-      state: 'SP',
+      coordinates: DEFAULT_COORDS,
+      city: 'Sua Localização',
+      state: 'Brasil',
       country: 'Brasil',
       source: 'fallback',
-      formatted: 'São Paulo - SP',
+      formatted: 'Localização Atual • GPS',
     };
 
     if (cached) {

@@ -54,10 +54,10 @@ export function App() {
   const [activePanel, setActivePanel] = useState<'map' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile'>('map');
   const [isNavigating, setIsNavigating] = useState(false);
 
-  // Geographic Coordinates (Defaults to São Paulo / Brasil)
+  // Geographic Coordinates (Central Brasil / updated via live location)
   const [currentLocation, setCurrentLocation] = useState<Coordinates>({
-    lat: -23.5505,
-    lng: -46.6333,
+    lat: -15.793889,
+    lng: -47.882778,
   });
   const [heading, setHeading] = useState(45);
 
@@ -160,6 +160,9 @@ export function App() {
           detectedCity: res.city,
           detectedState: res.state,
         }));
+        // Reload localized alerts and points for user's real Brazilian location
+        api.getOccurrences(res.coordinates).then(setOccurrences).catch(console.error);
+        api.getCultureSpots(res.coordinates).then(setCultureSpots).catch(console.error);
       })
       .catch(err => {
         console.warn('Detecção de localização aviso:', err);
@@ -248,7 +251,7 @@ export function App() {
 
   const refreshOccurrences = async () => {
     try {
-      const occ = await api.getOccurrences();
+      const occ = await api.getOccurrences(currentLocation);
       setOccurrences(occ);
     } catch (e) {
       console.error(e);

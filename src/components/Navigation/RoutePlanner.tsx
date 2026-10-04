@@ -40,11 +40,12 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
   routes,
   onTriggerVoice,
 }) => {
-  const [originText, setOriginText] = useState('Sua Localização Atual');
+  const [originText, setOriginText] = useState('Minha Localização Atual');
   const [originCoords, setOriginCoords] = useState<Coordinates>(currentLocation);
 
-  const [destText, setDestText] = useState('Av. Paulista, 1500 - São Paulo, SP');
-  const [destCoords, setDestCoords] = useState<Coordinates>({ lat: -23.5617, lng: -46.6559 });
+  // Clean and empty search bar by default
+  const [destText, setDestText] = useState('');
+  const [destCoords, setDestCoords] = useState<Coordinates | null>(null);
 
   const [mode, setMode] = useState<TransportMode>('car');
   const [avoidTolls, setAvoidTolls] = useState(false);
@@ -52,7 +53,14 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [searchSuggestions, setSearchSuggestions] = useState<GeocodeResult[]>([]);
   const [activeSearchField, setActiveSearchField] = useState<'origin' | 'dest' | null>(null);
 
-  // Address search via API
+  // Synchronize origin with live GPS if on default
+  React.useEffect(() => {
+    if (originText === 'Minha Localização Atual') {
+      setOriginCoords(currentLocation);
+    }
+  }, [currentLocation]);
+
+  // Address search via API biased to user's real location
   const handleSearch = async (query: string, field: 'origin' | 'dest') => {
     setActiveSearchField(field);
     if (query.trim().length < 3) {
@@ -61,7 +69,7 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
     }
 
     try {
-      const results = await api.geocode(query);
+      const results = await api.geocode(query, originCoords);
       setSearchSuggestions(results);
     } catch (e) {
       console.error(e);
@@ -81,9 +89,29 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
   };
 
   const handleCalculateRoute = async () => {
+    if (!destText.trim()) {
+      alert('Por favor, digite um endereço, bairro, CEP ou local de destino.');
+      return;
+    }
+
     setIsSearching(true);
     try {
-      const data = await api.calculateRoute(originCoords, destCoords, mode, { avoidTolls });
+      let targetCoords = destCoords;
+
+      // If user typed without clicking a suggestion, resolve destination online
+      if (!targetCoords) {
+        const results = await api.geocode(destText, originCoords);
+        if (results && results.length > 0) {
+          targetCoords = results[0].coordinates;
+          setDestCoords(targetCoords);
+        } else {
+          alert('Local de destino não encontrado. Tente digitar o nome da rua, número ou cidade.');
+          setIsSearching(false);
+          return;
+        }
+      }
+
+      const data = await api.calculateRoute(originCoords, targetCoords, mode, { avoidTolls });
       onRouteCalculated(data.routes, 0);
     } catch (err) {
       console.error(err);

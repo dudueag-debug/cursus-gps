@@ -25,6 +25,7 @@ interface CentralDeLocaisProps {
 
 export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
   onRouteToPlace,
+  userCoords,
 }) => {
   const [places, setPlaces] = useState<Place[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<PlaceCategory | 'all'>('all');
@@ -35,7 +36,7 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
     setLoading(true);
     try {
       const cat = selectedCategory === 'all' ? undefined : selectedCategory;
-      const data = await api.getPlaces(cat, searchQuery || undefined);
+      const data = await api.getPlaces(cat, searchQuery || undefined, userCoords);
       setPlaces(data);
     } catch (e) {
       console.error(e);
@@ -46,7 +47,7 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
 
   useEffect(() => {
     fetchPlaces();
-  }, [selectedCategory]);
+  }, [selectedCategory, userCoords]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
