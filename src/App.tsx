@@ -16,6 +16,7 @@ import { useVoiceCommander } from './hooks/useVoiceCommander';
 import type { UserProfile, Coordinates, RouteOption, Occurrence, CultureSpot, Place } from './types';
 import { api } from './services/api';
 import { locationService } from './services/locationService';
+import { userService } from './services/userService';
 
 export function App() {
   // Splash Screen State
@@ -141,13 +142,18 @@ export function App() {
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
 
-    // Load saved user profile (3D vehicle model, chosen voice, preferences)
-    const savedProfile = localStorage.getItem('tp_user_profile');
-    if (savedProfile) {
-      try {
-        const parsed = JSON.parse(savedProfile);
-        setUser(prev => ({ ...prev, ...parsed }));
-      } catch {}
+    // Load active session from isolated user account database
+    const activeSession = userService.getActiveSession();
+    if (activeSession) {
+      setUser(activeSession);
+    } else {
+      const savedProfile = localStorage.getItem('tp_user_profile');
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          setUser(prev => ({ ...prev, ...parsed }));
+        } catch {}
+      }
     }
 
     // Auto-detect user's real online location anywhere in Brazil (GPS or IP)
@@ -170,8 +176,9 @@ export function App() {
       });
 
     // Listen for real-time heading/orientation if on device
-    if (window.DeviceOrientationEvent) {
-      const handleOrientation = (e: DeviceOrientationEvent) => {
+    let handleOrientation: ((e: DeviceOrientationEvent) => void) | null = null;
+    if (typeof window !== 'undefined' && 'DeviceOrientationEvent' in window) {
+      handleOrientation = (e: DeviceOrientationEvent) => {
         if (e.alpha !== null && !isNaN(e.alpha)) {
           setHeading(360 - e.alpha);
         }
@@ -195,6 +202,9 @@ export function App() {
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      if (handleOrientation) {
+        window.removeEventListener('deviceorientation', handleOrientation);
+      }
     };
   }, []);
 
@@ -211,6 +221,15 @@ export function App() {
   const handleStartNavigation = () => {
     if (!selectedRoute) return;
 
+    // Record route in user's isolated history
+    userService.addRouteToUserHistory(
+      user.id,
+      detectedLocationName || 'Minha Localização',
+      selectedRoute.title || 'Destino TÔ PASSANDO',
+      selectedRoute.totalDistanceMeters,
+      selectedRoute.totalDurationSeconds
+    );
+
     // Safety Gate: for Car or Motorcycle, open safety checklist first if user hasn't verified
     if (['car', 'motorcycle'].includes(selectedRoute.mode)) {
       setIsSafetyModalOpen(true);
@@ -220,6 +239,15 @@ export function App() {
   };
 
   const handleProceedFromSafety = () => {
+    if (selectedRoute) {
+      userService.addRouteToUserHistory(
+        user.id,
+        detectedLocationName || 'Minha Localização',
+        selectedRoute.title || 'Destino TÔ PASSANDO',
+        selectedRoute.totalDistanceMeters,
+        selectedRoute.totalDurationSeconds
+      );
+    }
     setIsNavigating(true);
   };
 
@@ -382,7 +410,10 @@ export function App() {
         onClose={() => setIsProfileModalOpen(false)}
         user={user}
         onUpdateUser={updated => setUser(updated)}
-        onLogout={() => setIsAuthModalOpen(true)}
+        onLogout={() => {
+          setIsProfileModalOpen(false);
+          setIsAuthModalOpen(true);
+        }}
       />
 
       <AuthModal
@@ -390,6 +421,7 @@ export function App() {
         onClose={() => setIsAuthModalOpen(false)}
         onAuthSuccess={loggedUser => {
           setUser(prev => ({ ...prev, ...loggedUser }));
+          setIsAuthModalOpen(false);
         }}
       />
 

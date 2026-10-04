@@ -35,43 +35,47 @@ export function useVoiceCommander({
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    try {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
-      setIsSupported(false);
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'pt-BR';
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      setIsListening(true);
-      setTranscript('Ouvindo... Fale agora.');
-    };
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const current = event.results[0][0].transcript;
-      setTranscript(current);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.onerror = (event: any) => {
-      console.warn('Erro no reconhecimento de voz:', event.error);
-      setIsListening(false);
-      if (event.error === 'not-allowed') {
-        alert('Permissão de microfone negada. Permita o microfone no navegador para usar comandos de voz.');
+      if (!SpeechRecognition) {
+        setIsSupported(false);
+        return;
       }
-    };
 
-    recognitionRef.current = recognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setTranscript('Ouvindo... Fale agora.');
+      };
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        try {
+          const current = event.results[0][0].transcript;
+          setTranscript(current);
+        } catch {}
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('SpeechRecognition notice:', event?.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    } catch (err) {
+      console.warn('SpeechRecognition não suportado ou bloqueado neste dispositivo:', err);
+      setIsSupported(false);
+    }
 
     return () => {
       if (recognitionRef.current) {

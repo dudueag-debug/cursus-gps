@@ -14,6 +14,7 @@ import {
   Play
 } from 'lucide-react';
 import type { UserProfile, VehicleModel, VehicleColor, TransportMode } from '../../types';
+import { userService } from '../../services/userService';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -74,6 +75,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const handleSave = () => {
     onUpdateUser(profile);
+    userService.saveUserPrivateData(profile.id, { preferences: profile });
     localStorage.setItem('tp_user_profile', JSON.stringify(profile));
     setSaveSuccess(true);
     setTimeout(() => {

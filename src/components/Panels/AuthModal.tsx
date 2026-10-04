@@ -10,6 +10,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { userService } from '../../services/userService';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -39,8 +40,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       if (tab === 'login') {
-        const res = await api.login(identifier || 'eduardo@cursus.com.br');
-        onAuthSuccess(res.user);
+        const loggedUser = userService.login(identifier || 'piloto@cursus.com.br');
+        onAuthSuccess(loggedUser);
         onClose();
       } else if (tab === 'register') {
         if (!acceptedTerms) {
@@ -48,8 +49,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           setLoading(false);
           return;
         }
-        const res = await api.login(identifier);
-        onAuthSuccess({ ...res.user, name: name || identifier });
+        if (!identifier.trim()) {
+          setErrorMsg('Informe seu e-mail para criar a conta.');
+          setLoading(false);
+          return;
+        }
+        const newUser = userService.register(name || identifier.split('@')[0], identifier);
+        onAuthSuccess(newUser);
         onClose();
       } else {
         alert('Instruções de recuperação de senha enviadas para seu e-mail cadastrado.');
@@ -65,8 +71,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleGuest = async () => {
     setLoading(true);
     try {
-      const res = await api.guestLogin();
-      onAuthSuccess(res.user);
+      const guest = userService.createGuestSession();
+      onAuthSuccess(guest);
       onClose();
     } catch (e) {
       console.error(e);
