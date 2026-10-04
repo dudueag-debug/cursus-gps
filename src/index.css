@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "leaflet/dist/leaflet.css";
 
 :root {
   --tp-blue-primary: #0066FF;
@@ -12,27 +11,27 @@
   --tp-border: #23334d;
 }
 
-body {
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--tp-blue-midnight);
+  overflow: hidden;
+  background-color: #050B14;
   color: #F3F4F6;
-  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom leaflet map adjustments */
+/* Fullscreen Leaflet map adjustments */
 .leaflet-container {
-  width: 100%;
-  height: 100%;
-  background: #0f172a;
-}
-
-/* Dark mode map tiles invert filter for high-tech night look */
-.tech-tile-filter .leaflet-tile {
-  filter: brightness(0.85) contrast(1.15) saturate(1.1);
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  background: #0f172a !important;
+  font-family: inherit;
 }
 
 /* Custom vehicle marker animations */
@@ -66,7 +65,7 @@ body {
     transform: translateY(12px) scale(0.8);
   }
   100% {
-    opacity: 0;
+    opacity: 0.3;
     transform: translateY(24px) scale(0.3);
   }
 }

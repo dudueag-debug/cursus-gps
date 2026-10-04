@@ -273,6 +273,7 @@ export function App() {
             cultureSpots={cultureSpots}
             onSelectOccurrence={handleSelectOccurrence}
             onSelectCultureSpot={handleSelectCultureSpot}
+            isSplashActive={showSplash}
           />
 
           {/* Active Navigation HUD Overlay */}

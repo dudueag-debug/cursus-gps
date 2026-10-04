@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { Coordinates, RouteOption, Occurrence, CultureSpot, UserProfile } from '../../types';
+import type { Coordinates, RouteOption, Occurrence, CultureSpot, UserProfile } from '../../types';
 import { createVehicleDivIcon } from './VehicleMarkerIcon';
-import { Crosshair, ZoomIn, ZoomOut, Layers, Eye } from 'lucide-react';
+import { Crosshair, ZoomIn, ZoomOut, Eye, Layers } from 'lucide-react';
 
 interface GPSMapProps {
   currentLocation: Coordinates;
@@ -15,6 +15,7 @@ interface GPSMapProps {
   onSelectOccurrence: (occ: Occurrence) => void;
   onSelectCultureSpot: (spot: CultureSpot) => void;
   onMapClick?: (coords: Coordinates) => void;
+  isSplashActive?: boolean;
 }
 
 export const GPSMap: React.FC<GPSMapProps> = ({
@@ -28,6 +29,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   onSelectOccurrence,
   onSelectCultureSpot,
   onMapClick,
+  isSplashActive = false,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -50,13 +52,14 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         center: [currentLocation.lat, currentLocation.lng],
         zoom: 15,
         zoomControl: false,
-        attributionControl: false,
+        attributionControl: true,
       });
 
-      // High-tech dark Carto tile layer
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      // 100% Free Public OpenStreetMap Cartography (ZERO API KEYS, NO WATERMARKS)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        subdomains: 'abcd',
+        subdomains: ['a', 'b', 'c'],
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | TÔ PASSANDO',
       }).addTo(map);
 
       // Occurrences & Culture layer groups
@@ -87,6 +90,30 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       });
 
       mapRef.current = map;
+
+      // Force recalculation of container size to prevent grey/offset box
+      const invalidate = () => {
+        try {
+          if (mapRef.current) {
+            mapRef.current.invalidateSize();
+          }
+        } catch {}
+      };
+
+      invalidate();
+      setTimeout(invalidate, 100);
+      setTimeout(invalidate, 300);
+      setTimeout(invalidate, 700);
+      setTimeout(invalidate, 1500);
+
+      window.addEventListener('resize', invalidate);
+
+      if (mapContainerRef.current && window.ResizeObserver) {
+        const ro = new ResizeObserver(() => {
+          invalidate();
+        });
+        ro.observe(mapContainerRef.current);
+      }
     } catch (err) {
       console.warn('[GPSMap] Aviso de inicialização cartográfica:', err);
     }
@@ -102,6 +129,21 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       }
     };
   }, []);
+
+  // Recalculate map dimensions when splash screen is dismissed
+  useEffect(() => {
+    if (!isSplashActive && mapRef.current) {
+      const invalidate = () => {
+        try {
+          mapRef.current?.invalidateSize();
+        } catch {}
+      };
+      invalidate();
+      setTimeout(invalidate, 100);
+      setTimeout(invalidate, 300);
+      setTimeout(invalidate, 600);
+    }
+  }, [isSplashActive]);
 
   // Update Vehicle Marker Position, Icon, and Heading
   useEffect(() => {
@@ -165,7 +207,6 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     group.clearLayers();
 
     occurrences.forEach(occ => {
-      // Determine badge color based on severity and normalized state
       const isResolved = occ.isNormalized || occ.status === 'resolvida';
       const color = isResolved ? '#10B981' : occ.severity === 'critica' ? '#EF4444' : occ.severity === 'alta' ? '#F97316' : '#EAB308';
       
@@ -258,12 +299,16 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full min-h-[450px] bg-slate-950 overflow-hidden">
+    <div className="relative w-full h-full min-h-[300px] bg-slate-950 overflow-hidden flex flex-col">
       {/* Container Leaflet */}
-      <div ref={mapContainerRef} className="w-full h-full tech-tile-filter" />
+      <div 
+        ref={mapContainerRef} 
+        className="w-full h-full flex-1" 
+        style={{ width: '100%', height: '100%', minHeight: '300px' }}
+      />
 
       {/* Floating Controls HUD */}
-      <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
+      <div className="absolute top-4 right-4 z-[500] flex flex-col gap-2">
         <button
           onClick={handleRecenter}
           className="p-3 bg-slate-900/90 hover:bg-slate-800 text-lime-400 rounded-xl shadow-lg border border-slate-700/80 backdrop-blur-md active:scale-95 transition-all group"
@@ -301,7 +346,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       </div>
 
       {/* Live Map Legend Overlay */}
-      <div className="absolute bottom-4 left-4 z-20 hidden sm:flex items-center gap-3 bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300">
+      <div className="absolute bottom-4 left-4 z-[500] hidden sm:flex items-center gap-3 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 shadow-md">
         <div className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-lime-400 animate-pulse" />
           <span>Você ({user.vehicleModel})</span>
