@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Navigation2, 
   MapPin, 
@@ -9,7 +9,9 @@ import {
   User, 
   Radio,
   Download,
-  Mic
+  Mic,
+  Clock,
+  Calendar
 } from 'lucide-react';
 import type { UserProfile } from '../types';
 
@@ -36,6 +38,26 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
   detectedLocation = 'Buscando GPS...',
   onRecenterGPS,
 }) => {
+  // Live Date & Time in Brazil standard
+  const [currentTime, setCurrentTime] = useState<string>('');
+  const [currentDate, setCurrentDate] = useState<string>('');
+
+  useEffect(() => {
+    const updateDateTime = () => {
+      const now = new Date();
+      setCurrentTime(
+        now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      );
+      const weekday = now.toLocaleDateString('pt-BR', { weekday: 'short' });
+      const day = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      setCurrentDate(`${weekday.toUpperCase()} • ${day}`);
+    };
+
+    updateDateTime();
+    const interval = setInterval(updateDateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <header className="bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white px-3 sm:px-4 py-2.5 sticky top-0 z-[1000] transition-all shadow-xl shadow-black/50">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
@@ -63,7 +85,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
               </span>
             </div>
             
-            {/* Live Detected State & City Badge */}
+            {/* Live Detected State & City Badge with Mobile Clock */}
             <div 
               onClick={(e) => {
                 e.stopPropagation();
@@ -77,10 +99,26 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-500"></span>
               </span>
               <MapPin className="w-3 h-3 text-lime-400" />
-              <span className="font-semibold truncate max-w-[150px] sm:max-w-none">{detectedLocation}</span>
+              <span className="font-semibold truncate max-w-[130px] sm:max-w-none">{detectedLocation}</span>
+              {currentTime && (
+                <span className="sm:hidden text-[10px] font-mono text-cyan-300 bg-slate-900/90 border border-slate-700/60 px-1 rounded ml-0.5">
+                  {currentTime.slice(0, 5)}
+                </span>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Live Brazilian Clock & Date HUD (Desktop / Tablet) */}
+        {currentTime && (
+          <div className="hidden lg:flex items-center gap-2.5 bg-slate-900/90 border border-slate-700/80 px-3.5 py-1.5 rounded-2xl shadow-inner text-slate-200 backdrop-blur-md">
+            <Clock className="w-4 h-4 text-lime-400 animate-pulse" />
+            <div className="flex flex-col text-left leading-tight">
+              <span className="font-mono font-black text-xs text-white tracking-wider">{currentTime}</span>
+              <span className="text-[10px] text-slate-400 font-semibold">{currentDate}</span>
+            </div>
+          </div>
+        )}
 
         {/* Navigation Quick Tabs */}
         <nav className="flex items-center gap-1 sm:gap-2">

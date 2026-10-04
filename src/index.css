@@ -50,6 +50,13 @@ html, body, #root {
   z-index: 25 !important;
 }
 
+/* Reset any default Leaflet borders or background on custom vehicle marker */
+.tp-3d-vehicle-marker {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* Custom vehicle marker animations */
 @keyframes pulse-ring {
   0% {

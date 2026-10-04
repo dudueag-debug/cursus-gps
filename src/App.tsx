@@ -175,6 +175,39 @@ export function App() {
         setDetectedLocationName('Brasil • GPS Ativo');
       });
 
+    // Continuous Live High-Accuracy GPS Tracking
+    let watchId: number | null = null;
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      try {
+        watchId = navigator.geolocation.watchPosition(
+          pos => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            if (lat && lng) {
+              setCurrentLocation({ lat, lng });
+              if (
+                pos.coords.heading !== null &&
+                !isNaN(pos.coords.heading) &&
+                (pos.coords.speed || 0) > 0.5
+              ) {
+                setHeading(pos.coords.heading);
+              }
+            }
+          },
+          err => {
+            console.warn('GPS continuous watch notice:', err);
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 12000,
+          }
+        );
+      } catch (e) {
+        console.warn('Erro ao registrar watchPosition:', e);
+      }
+    }
+
     // Listen for real-time heading/orientation if on device
     let handleOrientation: ((e: DeviceOrientationEvent) => void) | null = null;
     if (typeof window !== 'undefined' && 'DeviceOrientationEvent' in window) {
@@ -204,6 +237,9 @@ export function App() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
       if (handleOrientation) {
         window.removeEventListener('deviceorientation', handleOrientation);
+      }
+      if (watchId !== null && typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.clearWatch(watchId);
       }
     };
   }, []);

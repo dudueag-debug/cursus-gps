@@ -52,25 +52,29 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         return {
           url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           maxZoom: 19,
+          subdomains: 'abc',
           attribution: 'Tiles &copy; Esri World Imagery &bull; TÔ PASSANDO',
         };
       case 'topo':
         return {
           url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
           maxZoom: 17,
+          subdomains: 'abc',
           attribution: '&copy; OpenTopoMap contributors &bull; TÔ PASSANDO',
         };
       case 'dark':
         return {
-          url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+          url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
           maxZoom: 19,
-          attribution: '&copy; CARTO Dark Matter &bull; TÔ PASSANDO',
+          subdomains: 'abcd',
+          attribution: '&copy; CARTO Dark Matter &bull; TÔ PASSANDO GPS',
         };
       case 'streets':
       default:
         return {
           url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
           maxZoom: 19,
+          subdomains: 'abc',
           attribution: '&copy; OpenStreetMap contributors &bull; TÔ PASSANDO',
         };
     }
@@ -89,6 +93,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     const newTile = L.tileLayer(config.url, {
       maxZoom: config.maxZoom,
       attribution: config.attribution,
+      subdomains: config.subdomains || 'abc',
     }).addTo(mapRef.current);
 
     tileLayerRef.current = newTile;
@@ -115,6 +120,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       const baseTile = L.tileLayer(config.url, {
         maxZoom: config.maxZoom,
         attribution: config.attribution,
+        subdomains: config.subdomains || 'abc',
       }).addTo(map);
       tileLayerRef.current = baseTile;
 
@@ -361,12 +367,12 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
   return (
     <div className="relative w-full h-full min-h-[300px] bg-slate-950 overflow-hidden flex flex-col isolate z-0">
-      {/* 3D Viewport Transform Wrapper */}
+      {/* 3D Viewport Transform Wrapper - Perfect Center Origin */}
       <div 
         className="w-full h-full flex-1 transition-transform duration-500 ease-out"
         style={{
           transform: is3DMode ? 'perspective(850px) rotateX(28deg) scale(1.12)' : 'none',
-          transformOrigin: 'center 85%',
+          transformOrigin: 'center center',
         }}
       >
         {/* Container Leaflet */}
@@ -383,9 +389,22 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         <button
           onClick={handleRecenter}
           className="p-3 bg-slate-900/90 hover:bg-slate-800 text-lime-400 rounded-xl shadow-xl border border-slate-700/80 backdrop-blur-md active:scale-95 transition-all group"
-          title="Centralizar na Minha Posição"
+          title="Centralizar no Meu Veículo (GPS)"
         >
           <Crosshair className="w-5 h-5 group-hover:rotate-45 transition-transform" />
+        </button>
+
+        {/* Noturno Futurista Quick Toggle */}
+        <button
+          onClick={() => switchLayer(activeLayer === 'dark' ? 'streets' : 'dark')}
+          className={`p-3 rounded-xl shadow-xl border backdrop-blur-md active:scale-95 transition-all flex items-center justify-center ${
+            activeLayer === 'dark'
+              ? 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-500/30'
+              : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700/80'
+          }`}
+          title={activeLayer === 'dark' ? 'Modo Noturno Futurista Ativo (Clique para Diurno)' : 'Ativar Modo Noturno Futurista'}
+        >
+          <span className="text-base leading-none select-none">🌙</span>
         </button>
 
         {/* 3D Perspective Toggle Button */}

@@ -288,11 +288,14 @@ export const createVehicleDivIcon = (
 
   const html = `
     <div class="relative flex items-center justify-center w-16 h-16 select-none cursor-pointer">
+      <!-- High-Precision GPS Anchor Point Dot (True Location) -->
+      <div class="absolute w-2.5 h-2.5 rounded-full bg-lime-400 border border-slate-950 shadow-[0_0_8px_#CCFF00] z-0 pointer-events-none"></div>
+
       <!-- 3D Radar Pulse Ring -->
       <div class="absolute w-14 h-14 rounded-full border border-lime-400/40 animate-ping opacity-30 pointer-events-none"></div>
 
-      <!-- Realistic 3D Vehicle with directional rotation -->
-      <div class="relative flex items-center justify-center transition-transform duration-200 ease-out" style="transform: rotate(${headingDegrees}deg); transform-origin: center center;">
+      <!-- Realistic 3D Vehicle with directional rotation around true center -->
+      <div class="relative z-10 flex items-center justify-center transition-transform duration-200 ease-out" style="transform: rotate(${headingDegrees}deg); transform-origin: center center;">
         ${vehicleSvg}
         ${windEffectHtml}
       </div>

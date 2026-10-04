@@ -34,27 +34,21 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Safe network-first / cache-fallback strategy
+// Fetch: Safe network-first / cache-fallback strategy for local static shell only
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
   const url = new URL(event.request.url);
 
-  // Bypass non-GET requests, API endpoints, and external services (Maps, Tiles, Routing, Geocoding)
-  if (
-    event.request.method !== 'GET' ||
-    url.pathname.startsWith('/api') ||
-    url.hostname.includes('tile.openstreetmap.org') ||
-    url.hostname.includes('arcgisonline.com') ||
-    url.hostname.includes('project-osrm.org') ||
-    url.hostname.includes('nominatim.openstreetmap.org') ||
-    url.hostname.includes('viacep.com.br') ||
-    url.hostname.includes('ipwho.is') ||
-    url.hostname.includes('geojs.io')
-  ) {
+  // Bypass all cross-origin requests (CartoCDN, OSM, ArcGIS, nominatim, APIs)
+  if (url.origin !== self.location.origin) {
     return;
   }
 
-  // Same-origin assets handling
-  if (url.origin === self.location.origin) {
+  // Bypass local API endpoints
+  if (url.pathname.startsWith('/api')) {
+    return;
+  }
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
