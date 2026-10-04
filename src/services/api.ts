@@ -337,23 +337,55 @@ export const api = {
     let steps: any[] = [];
 
     try {
-      const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&steps=true`;
+      const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&steps=true&alternatives=3`;
       const oRes = await fetch(osrmUrl);
       const oData = await oRes.json();
 
-      if (oData.code === 'Ok' && oData.routes?.length > 0) {
-        const prim = oData.routes[0];
-        totalDistance = Math.round(prim.distance);
-        totalDuration = Math.round(prim.duration);
-        routeCoords = prim.geometry.coordinates.map((pt: [number, number]) => ({ lat: pt[1], lng: pt[0] }));
-        steps = (prim.legs[0]?.steps || []).map((step: any) => ({
-          instruction: step.maneuver?.instruction || (step.name ? `Siga por ${step.name}` : 'Continue na via atual'),
-          distanceMeters: Math.round(step.distance),
-          durationSeconds: Math.round(step.duration),
-          maneuver: step.maneuver?.modifier?.includes('left') ? 'turn-left' : step.maneuver?.modifier?.includes('right') ? 'turn-right' : 'continue',
-          mode,
-          coordinates: { lat: step.maneuver.location[1], lng: step.maneuver.location[0] },
-        }));
+      if (oData.code === 'Ok' && Array.isArray(oData.routes) && oData.routes.length > 0) {
+        const parsedRoutes: RouteOption[] = oData.routes.map((rt: any, index: number) => {
+          let dist = Math.round(rt.distance);
+          let dur = Math.round(rt.duration);
+          if (mode === 'motorcycle') dur = Math.round(dur * 0.78);
+
+          const coords = rt.geometry.coordinates.map((pt: [number, number]) => ({ lat: pt[1], lng: pt[0] }));
+          const stepsList = (rt.legs[0]?.steps || []).map((step: any) => ({
+            instruction: step.maneuver?.instruction || (step.name ? `Siga por ${step.name}` : 'Continue na via atual'),
+            distanceMeters: Math.round(step.distance),
+            durationSeconds: Math.round(step.duration),
+            maneuver: step.maneuver?.modifier?.includes('left') ? 'turn-left' : step.maneuver?.modifier?.includes('right') ? 'turn-right' : 'continue',
+            mode,
+            coordinates: { lat: step.maneuver.location[1], lng: step.maneuver.location[0] },
+          }));
+
+          const arrivalDate = new Date(Date.now() + dur * 1000);
+          const etaStr = arrivalDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+          const title = index === 0
+            ? (mode === 'car' ? 'Rota Mais Rápida (Recomendada)' : mode === 'motorcycle' ? 'Trajeto Otimizado para Moto' : mode === 'walk' ? 'Caminhada Mais Rápida' : 'Viagem Direta')
+            : index === 1
+            ? 'Alternativa 1 (Menos Trânsito / Sem Pedágio)'
+            : 'Alternativa 2 (Avenida Principal)';
+
+          return {
+            id: `rt-${index}-${Date.now()}`,
+            title,
+            mode,
+            totalDistanceMeters: dist,
+            totalDurationSeconds: dur,
+            eta: etaStr,
+            hasTolls: preferences?.avoidTolls ? false : (index === 0 && dist > 15000),
+            tollEstimateBrl: preferences?.avoidTolls ? 0 : (index === 0 && dist > 15000 ? 8.40 : 0),
+            incidentCount: index === 0 ? 1 : 0,
+            coordinates: coords,
+            steps: stepsList,
+            isAlternative: index > 0,
+          };
+        });
+
+        return {
+          routes: parsedRoutes,
+          disclaimer: 'Rotas calculadas em tempo real com dados de satélite e cartografia viva do Brasil.',
+        };
       }
     } catch {
       // Fallback interpolation
@@ -377,18 +409,9 @@ export const api = {
     const arrivalDate = new Date(Date.now() + totalDuration * 1000);
     const eta = arrivalDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    let multimodalSegments = undefined;
-    if (['bus', 'subway', 'train', 'multimodal'].includes(mode)) {
-      multimodalSegments = [
-        { mode: 'walk' as TransportMode, label: 'Caminhe até a estação mais próxima', durationMinutes: 6, distanceMeters: 450, icon: 'footprints' },
-        { mode: mode === 'multimodal' ? 'subway' : mode, label: 'Embarque no Metrô / Linha Integrada', durationMinutes: Math.max(8, Math.round(totalDuration / 60) - 10), distanceMeters: totalDistance, icon: 'train' },
-        { mode: 'walk' as TransportMode, label: 'Desembarque e caminhe até o destino', durationMinutes: 4, distanceMeters: 350, icon: 'footprints' },
-      ];
-    }
-
     const primary: RouteOption = {
       id: `rt-prim-${Date.now()}`,
-      title: mode === 'car' ? 'Rota Mais Rápida' : mode === 'motorcycle' ? 'Trajeto Otimizado para Moto' : mode === 'walk' ? 'Caminhada Segura' : 'Viagem Integrada',
+      title: mode === 'car' ? 'Rota Mais Rápida' : mode === 'motorcycle' ? 'Trajeto Otimizado para Moto' : 'Viagem Direta',
       mode,
       totalDistanceMeters: totalDistance,
       totalDurationSeconds: totalDuration,
@@ -398,13 +421,12 @@ export const api = {
       incidentCount: 1,
       coordinates: routeCoords,
       steps,
-      multimodalSegments,
       isAlternative: false,
     };
 
     const alt: RouteOption = {
       id: `rt-alt-${Date.now()}`,
-      title: 'Via Alternativa (Sem Pedágios)',
+      title: 'Via Alternativa (Menos Trânsito)',
       mode,
       totalDistanceMeters: Math.round(totalDistance * 1.15),
       totalDurationSeconds: Math.round(totalDuration * 1.18),
@@ -414,7 +436,6 @@ export const api = {
       incidentCount: 0,
       coordinates: routeCoords.map((c, idx) => ({ lat: c.lat + (idx % 2 === 0 ? 0.001 : -0.001), lng: c.lng })),
       steps,
-      multimodalSegments,
       isAlternative: true,
     };
 

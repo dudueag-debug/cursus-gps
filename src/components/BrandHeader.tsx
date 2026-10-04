@@ -21,6 +21,8 @@ interface BrandHeaderProps {
   openInstallModal: () => void;
   openVoiceModal: () => void;
   activeOccurrencesCount: number;
+  detectedLocation?: string;
+  onRecenterGPS?: () => void;
 }
 
 export const BrandHeader: React.FC<BrandHeaderProps> = ({
@@ -31,9 +33,11 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
   openInstallModal,
   openVoiceModal,
   activeOccurrencesCount,
+  detectedLocation = 'Buscando GPS...',
+  onRecenterGPS,
 }) => {
   return (
-    <header className="bg-slate-950/90 backdrop-blur-md border-b border-slate-800 text-white px-4 py-2.5 sticky top-0 z-40 transition-all shadow-lg shadow-black/40">
+    <header className="bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white px-3 sm:px-4 py-2.5 sticky top-0 z-[1000] transition-all shadow-xl shadow-black/50">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
         {/* Logo & Slogan */}
         <div 
@@ -41,10 +45,9 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
           className="flex items-center gap-3 cursor-pointer group select-none"
         >
           <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 p-0.5 shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform flex items-center justify-center">
-            {/* Wind / Road road shape with glowing compass */}
+            {/* Wind / Road shape with glowing compass */}
             <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center relative overflow-hidden">
               <div className="absolute inset-0 bg-blue-500/10" />
-              {/* Road lines */}
               <div className="absolute w-1 h-6 bg-lime-400/80 rounded-full rotate-12 -left-1 opacity-75" />
               <Navigation2 className="w-5 h-5 text-lime-400 transform rotate-45 group-hover:rotate-90 transition-transform duration-300 drop-shadow-[0_0_8px_rgba(204,255,0,0.8)]" />
             </div>
@@ -59,9 +62,23 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
                 CURSUS
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
-              Você vai. A gente te guia. • <span className="text-lime-400 font-semibold">Brasil Multimodal</span>
-            </p>
+            
+            {/* Live Detected State & City Badge */}
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onRecenterGPS) onRecenterGPS();
+              }}
+              className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer hover:text-lime-300 transition-colors"
+              title="Clique para centralizar na sua localização real"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-500"></span>
+              </span>
+              <MapPin className="w-3 h-3 text-lime-400" />
+              <span className="font-semibold truncate max-w-[150px] sm:max-w-none">{detectedLocation}</span>
+            </div>
           </div>
         </div>
 

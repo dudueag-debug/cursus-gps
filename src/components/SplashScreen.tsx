@@ -13,7 +13,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onEnterApp }) => {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-between p-6 overflow-hidden select-none">
+    <div className="fixed inset-0 z-[99999] bg-slate-950 flex flex-col items-center justify-between p-6 overflow-hidden select-none">
       {/* Background Neon Road & Particle Effect */}
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
         {/* Perspective Road Grids */}

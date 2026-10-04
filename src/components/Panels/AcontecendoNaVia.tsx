@@ -282,7 +282,7 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
 
       {/* Discussion modal for the incident */}
       {selectedOccForChat && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-4 shadow-2xl flex flex-col gap-3 max-h-[85vh]">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <div>
@@ -346,7 +346,7 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
 
       {/* Modal: Relatar Nova Ocorrência */}
       {isReportingModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 shadow-2xl flex flex-col gap-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <h3 className="font-bold text-base text-white flex items-center gap-2">

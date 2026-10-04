@@ -1,8 +1,10 @@
 export type TransportMode = 'car' | 'motorcycle' | 'bus' | 'train' | 'subway' | 'walk' | 'multimodal';
 
-export type VehicleModel = 'sedan' | 'suv' | 'motorcycle_sport' | 'motorcycle_scooter' | 'van' | 'walker';
+export type VehicleModel = 'sport' | 'sedan' | 'suv' | 'motorcycle_sport' | 'motorcycle_scooter' | 'van' | 'walker';
 
-export type VehicleColor = 'lime' | 'electric_blue' | 'cyber_yellow' | 'ruby_red' | 'silver';
+export type VehicleColor = 'lime' | 'electric_blue' | 'cyber_yellow' | 'ruby_red' | 'silver' | 'stealth_dark';
+
+export type MapLayerType = 'streets' | 'satellite' | 'topo' | 'dark';
 
 export interface UserProfile {
   id: string;
@@ -18,6 +20,13 @@ export interface UserProfile {
   enableWindEffect: boolean;
   enableVoiceInstructions: boolean;
   enableCultureAudio: boolean;
+  selectedVoiceURI?: string;
+  voiceRate?: number;
+  voicePitch?: number;
+  mapLayerType?: MapLayerType;
+  is3DMode?: boolean;
+  detectedState?: string;
+  detectedCity?: string;
   privacy: {
     shareLocationWithCommunity: boolean;
     saveRouteHistory: boolean;

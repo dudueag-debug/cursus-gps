@@ -15,10 +15,14 @@ import { SplashScreen } from './components/SplashScreen';
 import { useVoiceCommander } from './hooks/useVoiceCommander';
 import type { UserProfile, Coordinates, RouteOption, Occurrence, CultureSpot, Place } from './types';
 import { api } from './services/api';
+import { locationService } from './services/locationService';
 
 export function App() {
   // Splash Screen State
   const [showSplash, setShowSplash] = useState(true);
+
+  // Detected Brazilian Location Name (City - State)
+  const [detectedLocationName, setDetectedLocationName] = useState<string>('Detectando GPS...');
 
   // User & Profile State
   const [user, setUser] = useState<UserProfile>({
@@ -82,7 +86,14 @@ export function App() {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'pt-BR';
-      utterance.rate = 1.05;
+      utterance.rate = user.voiceRate || 1.05;
+
+      if (user.selectedVoiceURI) {
+        const voices = window.speechSynthesis.getVoices();
+        const found = voices.find(v => v.voiceURI === user.selectedVoiceURI);
+        if (found) utterance.voice = found;
+      }
+
       window.speechSynthesis.speak(utterance);
     } catch (e) {
       console.warn('Speech synthesis error:', e);
@@ -130,23 +141,39 @@ export function App() {
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
 
-    // Try browser Geolocation API
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          setCurrentLocation({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          });
-          if (pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
-            setHeading(pos.coords.heading);
-          }
-        },
-        err => {
-          console.log('GPS permissão padrão ou não disponível:', err.message);
-        },
-        { enableHighAccuracy: true, timeout: 6000 }
-      );
+    // Load saved user profile (3D vehicle model, chosen voice, preferences)
+    const savedProfile = localStorage.getItem('tp_user_profile');
+    if (savedProfile) {
+      try {
+        const parsed = JSON.parse(savedProfile);
+        setUser(prev => ({ ...prev, ...parsed }));
+      } catch {}
+    }
+
+    // Auto-detect user's real online location anywhere in Brazil (GPS or IP)
+    locationService.detectUserLocation()
+      .then(res => {
+        setCurrentLocation(res.coordinates);
+        setDetectedLocationName(res.formatted);
+        setUser(prev => ({
+          ...prev,
+          detectedCity: res.city,
+          detectedState: res.state,
+        }));
+      })
+      .catch(err => {
+        console.warn('Detecção de localização aviso:', err);
+        setDetectedLocationName('Brasil • GPS Ativo');
+      });
+
+    // Listen for real-time heading/orientation if on device
+    if (window.DeviceOrientationEvent) {
+      const handleOrientation = (e: DeviceOrientationEvent) => {
+        if (e.alpha !== null && !isNaN(e.alpha)) {
+          setHeading(360 - e.alpha);
+        }
+      };
+      window.addEventListener('deviceorientation', handleOrientation);
     }
 
     // Fetch occurrences & culture spots
@@ -257,6 +284,13 @@ export function App() {
           voice.startListening();
         }}
         activeOccurrencesCount={occurrences.filter(o => !o.isNormalized).length}
+        detectedLocation={detectedLocationName}
+        onRecenterGPS={() => {
+          locationService.detectUserLocation().then(res => {
+            setCurrentLocation(res.coordinates);
+            setDetectedLocationName(res.formatted);
+          });
+        }}
       />
 
       {/* Main Content Area */}

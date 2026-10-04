@@ -33,7 +33,7 @@ export const VoiceCommandModal: React.FC<VoiceCommandModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
       <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-lg p-6 shadow-2xl flex flex-col items-center gap-5 text-white text-center relative overflow-hidden">
         {/* Close Button */}
         <button
