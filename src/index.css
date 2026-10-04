@@ -57,6 +57,28 @@ html, body, #root {
   box-shadow: none !important;
 }
 
+/* Noturno Futurista Neon Cyber Dark Map Tile Filter */
+.leaflet-tile-futuristic-dark {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(130%) saturate(145%) !important;
+  background-color: #050B14 !important;
+}
+
+/* Glow animation for critical warnings on highway */
+@keyframes warning-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+  }
+}
+
+.animate-warning-glow {
+  animation: warning-pulse 2s ease-in-out infinite;
+}
+
 /* Custom vehicle marker animations */
 @keyframes pulse-ring {
   0% {

@@ -12,6 +12,7 @@ import { AuthModal } from './components/Panels/AuthModal';
 import { InstallAppModal } from './components/Panels/InstallAppModal';
 import { VoiceCommandModal } from './components/Navigation/VoiceCommandModal';
 import { SplashScreen } from './components/SplashScreen';
+import { ViaCardHUD } from './components/Navigation/ViaCardHUD';
 import { useVoiceCommander } from './hooks/useVoiceCommander';
 import type { UserProfile, Coordinates, RouteOption, Occurrence, CultureSpot, Place } from './types';
 import { api } from './services/api';
@@ -305,7 +306,8 @@ export function App() {
   };
 
   const handleSelectOccurrence = (occ: Occurrence) => {
-    setActivePanel('occurrences');
+    setCurrentLocation(occ.coordinates);
+    setActivePanel('map');
   };
 
   const handleSelectCultureSpot = (spot: CultureSpot) => {
@@ -375,6 +377,15 @@ export function App() {
             onSelectOccurrence={handleSelectOccurrence}
             onSelectCultureSpot={handleSelectCultureSpot}
             isSplashActive={showSplash}
+          />
+
+          {/* Acontecendo na Via - Floating Interactive Card */}
+          <ViaCardHUD
+            occurrences={occurrences}
+            currentLocation={currentLocation}
+            onSelectOccurrence={handleSelectOccurrence}
+            onOpenReportModal={() => setActivePanel('occurrences')}
+            onConfirmOccurrence={(id) => api.confirmOccurrence(id, 'confirm_active').catch(console.error)}
           />
 
           {/* Active Navigation HUD Overlay */}

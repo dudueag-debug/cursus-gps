@@ -64,10 +64,11 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         };
       case 'dark':
         return {
-          url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+          url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
           maxZoom: 19,
-          subdomains: 'abcd',
-          attribution: '&copy; CARTO Dark Matter &bull; TÔ PASSANDO GPS',
+          subdomains: 'abc',
+          className: 'leaflet-tile-futuristic-dark',
+          attribution: '&copy; OpenStreetMap contributors &bull; TÔ PASSANDO Noturno Futurista',
         };
       case 'streets':
       default:
@@ -75,6 +76,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
           url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
           maxZoom: 19,
           subdomains: 'abc',
+          className: '',
           attribution: '&copy; OpenStreetMap contributors &bull; TÔ PASSANDO',
         };
     }
@@ -94,6 +96,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       maxZoom: config.maxZoom,
       attribution: config.attribution,
       subdomains: config.subdomains || 'abc',
+      className: (config as any).className || '',
     }).addTo(mapRef.current);
 
     tileLayerRef.current = newTile;
@@ -121,6 +124,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         maxZoom: config.maxZoom,
         attribution: config.attribution,
         subdomains: config.subdomains || 'abc',
+        className: (config as any).className || '',
       }).addTo(map);
       tileLayerRef.current = baseTile;
 
@@ -521,26 +525,16 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         </div>
       </div>
 
-      {/* Floating Bottom Info & Mode Pill */}
-      <div className="absolute bottom-4 left-4 z-30 flex items-center gap-2">
-        <div className="hidden sm:flex items-center gap-3 bg-slate-950/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 shadow-xl">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-lime-400 animate-pulse" />
-            <span>Você ({user.vehicleModel === 'sport' ? 'Superesportivo 3D' : user.vehicleModel === 'suv' ? 'SUV 3D' : 'Carro 3D'})</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-            <span>Ocorrências</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-            <span>Patrimônio</span>
-          </div>
-        </div>
-
+      {/* Floating Info & Mode Pill (Top Left) */}
+      <div className="absolute top-4 left-4 z-20 flex items-center gap-2 pointer-events-none">
         {is3DMode && (
-          <div className="px-2.5 py-1 rounded-xl bg-lime-400/90 text-slate-950 font-black text-[10px] tracking-wider uppercase shadow-lg shadow-lime-500/20">
+          <div className="px-2.5 py-1 rounded-xl bg-lime-400 text-slate-950 font-black text-[10px] tracking-wider uppercase shadow-lg shadow-lime-500/20 border border-lime-300">
             Modo 3D Ativo
+          </div>
+        )}
+        {activeLayer === 'dark' && (
+          <div className="px-2.5 py-1 rounded-xl bg-indigo-600 text-white font-black text-[10px] tracking-wider uppercase shadow-lg shadow-indigo-500/20 border border-indigo-400">
+            🌙 Noturno Futurista
           </div>
         )}
       </div>
