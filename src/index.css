@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "leaflet/dist/leaflet.css";
 
 :root {
   --tp-blue-primary: #0066FF;
@@ -12,27 +11,78 @@
   --tp-border: #23334d;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--tp-blue-midnight);
-  color: #F3F4F6;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Custom leaflet map adjustments */
-.leaflet-container {
+html, body, #root {
   width: 100%;
   height: 100%;
-  background: #0f172a;
+  height: 100dvh;
+  min-height: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #050B14;
+  color: #F3F4F6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-/* Dark mode map tiles invert filter for high-tech night look */
-.tech-tile-filter .leaflet-tile {
-  filter: brightness(0.85) contrast(1.15) saturate(1.1);
+/* Fullscreen Leaflet map adjustments */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  background: #050B14 !important;
+  font-family: inherit;
+  isolation: isolate;
+  z-index: 0 !important;
+  touch-action: pan-x pan-y !important;
+}
+
+
+/* Ensure Leaflet controls and popups stay strictly bounded below app UI */
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 20 !important;
+}
+
+.leaflet-pane {
+  z-index: 10 !important;
+}
+
+.leaflet-popup-pane {
+  z-index: 25 !important;
+}
+
+/* Reset any default Leaflet borders or background on custom vehicle marker */
+.tp-3d-vehicle-marker {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Noturno Futurista Neon Cyber Dark Map Tile Filter */
+.leaflet-tile-futuristic-dark {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(130%) saturate(145%) !important;
+  background-color: #050B14 !important;
+}
+
+/* Glow animation for critical warnings on highway */
+@keyframes warning-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+  }
+}
+
+.animate-warning-glow {
+  animation: warning-pulse 2s ease-in-out infinite;
 }
 
 /* Custom vehicle marker animations */
@@ -66,7 +116,7 @@ body {
     transform: translateY(12px) scale(0.8);
   }
   100% {
-    opacity: 0;
+    opacity: 0.3;
     transform: translateY(24px) scale(0.3);
   }
 }

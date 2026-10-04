@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Navigation2, 
   MapPin, 
@@ -8,9 +8,12 @@ import {
   BookOpen, 
   User, 
   Radio,
-  Download
+  Download,
+  Mic,
+  Clock,
+  Calendar
 } from 'lucide-react';
-import { UserProfile } from '../types';
+import type { UserProfile } from '../types';
 
 interface BrandHeaderProps {
   user: UserProfile;
@@ -18,7 +21,10 @@ interface BrandHeaderProps {
   setActivePanel: (panel: 'map' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile') => void;
   openSafetyModal: () => void;
   openInstallModal: () => void;
+  openVoiceModal: () => void;
   activeOccurrencesCount: number;
+  detectedLocation?: string;
+  onRecenterGPS?: () => void;
 }
 
 export const BrandHeader: React.FC<BrandHeaderProps> = ({
@@ -27,10 +33,33 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
   setActivePanel,
   openSafetyModal,
   openInstallModal,
+  openVoiceModal,
   activeOccurrencesCount,
+  detectedLocation = 'Buscando GPS...',
+  onRecenterGPS,
 }) => {
+  // Live Date & Time in Brazil standard
+  const [currentTime, setCurrentTime] = useState<string>('');
+  const [currentDate, setCurrentDate] = useState<string>('');
+
+  useEffect(() => {
+    const updateDateTime = () => {
+      const now = new Date();
+      setCurrentTime(
+        now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      );
+      const weekday = now.toLocaleDateString('pt-BR', { weekday: 'short' });
+      const day = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      setCurrentDate(`${weekday.toUpperCase()} • ${day}`);
+    };
+
+    updateDateTime();
+    const interval = setInterval(updateDateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <header className="bg-slate-950/90 backdrop-blur-md border-b border-slate-800 text-white px-4 py-2.5 sticky top-0 z-40 transition-all shadow-lg shadow-black/40">
+    <header className="bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white px-3 sm:px-4 py-2.5 sticky top-0 z-[1000] transition-all shadow-xl shadow-black/50">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
         {/* Logo & Slogan */}
         <div 
@@ -38,10 +67,9 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
           className="flex items-center gap-3 cursor-pointer group select-none"
         >
           <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 p-0.5 shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform flex items-center justify-center">
-            {/* Wind / Road road shape with glowing compass */}
+            {/* Wind / Road shape with glowing compass */}
             <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center relative overflow-hidden">
               <div className="absolute inset-0 bg-blue-500/10" />
-              {/* Road lines */}
               <div className="absolute w-1 h-6 bg-lime-400/80 rounded-full rotate-12 -left-1 opacity-75" />
               <Navigation2 className="w-5 h-5 text-lime-400 transform rotate-45 group-hover:rotate-90 transition-transform duration-300 drop-shadow-[0_0_8px_rgba(204,255,0,0.8)]" />
             </div>
@@ -56,11 +84,41 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
                 CURSUS
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
-              Você vai. A gente te guia. • <span className="text-lime-400 font-semibold">Brasil Multimodal</span>
-            </p>
+            
+            {/* Live Detected State & City Badge with Mobile Clock */}
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onRecenterGPS) onRecenterGPS();
+              }}
+              className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer hover:text-lime-300 transition-colors"
+              title="Clique para centralizar na sua localização real"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-500"></span>
+              </span>
+              <MapPin className="w-3 h-3 text-lime-400" />
+              <span className="font-semibold truncate max-w-[130px] sm:max-w-none">{detectedLocation}</span>
+              {currentTime && (
+                <span className="sm:hidden text-[10px] font-mono text-cyan-300 bg-slate-900/90 border border-slate-700/60 px-1 rounded ml-0.5">
+                  {currentTime.slice(0, 5)}
+                </span>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Live Brazilian Clock & Date HUD (Desktop / Tablet) */}
+        {currentTime && (
+          <div className="hidden lg:flex items-center gap-2.5 bg-slate-900/90 border border-slate-700/80 px-3.5 py-1.5 rounded-2xl shadow-inner text-slate-200 backdrop-blur-md">
+            <Clock className="w-4 h-4 text-lime-400 animate-pulse" />
+            <div className="flex flex-col text-left leading-tight">
+              <span className="font-mono font-black text-xs text-white tracking-wider">{currentTime}</span>
+              <span className="text-[10px] text-slate-400 font-semibold">{currentDate}</span>
+            </div>
+          </div>
+        )}
 
         {/* Navigation Quick Tabs */}
         <nav className="flex items-center gap-1 sm:gap-2">
@@ -129,6 +187,16 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
           >
             <BookOpen className="w-4 h-4 text-purple-400" />
             <span className="hidden xl:inline">Cultura & História</span>
+          </button>
+
+          {/* Comando de Voz */}
+          <button
+            onClick={openVoiceModal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 shadow-sm active:scale-95 transition-all"
+            title="Comando de Voz Inteligente"
+          >
+            <Mic className="w-3.5 h-3.5 text-lime-400 animate-pulse" />
+            <span className="hidden md:inline">Voz</span>
           </button>
 
           {/* Baixar / Instalar App */}

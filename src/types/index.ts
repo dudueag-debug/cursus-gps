@@ -1,8 +1,10 @@
 export type TransportMode = 'car' | 'motorcycle' | 'bus' | 'train' | 'subway' | 'walk' | 'multimodal';
 
-export type VehicleModel = 'sedan' | 'suv' | 'motorcycle_sport' | 'motorcycle_scooter' | 'van' | 'walker';
+export type VehicleModel = 'sport' | 'sedan' | 'suv' | 'motorcycle_sport' | 'motorcycle_scooter' | 'van' | 'walker';
 
-export type VehicleColor = 'lime' | 'electric_blue' | 'cyber_yellow' | 'ruby_red' | 'silver';
+export type VehicleColor = 'lime' | 'electric_blue' | 'cyber_yellow' | 'ruby_red' | 'silver' | 'stealth_dark';
+
+export type MapLayerType = 'streets' | 'satellite' | 'topo' | 'dark';
 
 export interface UserProfile {
   id: string;
@@ -18,6 +20,13 @@ export interface UserProfile {
   enableWindEffect: boolean;
   enableVoiceInstructions: boolean;
   enableCultureAudio: boolean;
+  selectedVoiceURI?: string;
+  voiceRate?: number;
+  voicePitch?: number;
+  mapLayerType?: MapLayerType;
+  is3DMode?: boolean;
+  detectedState?: string;
+  detectedCity?: string;
   privacy: {
     shareLocationWithCommunity: boolean;
     saveRouteHistory: boolean;
@@ -82,12 +91,20 @@ export interface RouteOption {
 }
 
 export type OccurrenceCategory = 
-  | 'obras'
-  | 'recapeamento'
-  | 'acidente'
-  | 'congestionamento'
+  | 'engarrafamento'
   | 'alagamento'
   | 'buraco'
+  | 'objeto_via'
+  | 'veiculo_parado'
+  | 'acidente'
+  | 'blitz'
+  | 'via_parcialmente_interditada'
+  | 'via_interditada'
+  | 'acesso_fechado'
+  | 'ponto_roubo'
+  | 'local_perigoso'
+  | 'obras'
+  | 'recapeamento'
   | 'oleo_pista'
   | 'areia_lama'
   | 'arvore_caida'
@@ -139,6 +156,11 @@ export interface Occurrence {
 
 export type PlaceCategory = 
   | 'saude'
+  | 'posto_gnv'
+  | 'borracheiro'
+  | 'policia'
+  | 'reboque_socorro'
+  | 'bateria_auto'
   | 'comercio_servicos'
   | 'lazer_cultura'
   | 'transporte_infraestrutura';
@@ -152,13 +174,25 @@ export interface Place {
   cep?: string;
   coordinates: Coordinates;
   phone?: string;
+  whatsapp?: string;
   website?: string;
   openingHours?: string;
   isOpen?: boolean;
   is24h?: boolean;
+  hasGNV?: boolean;
   rating?: number;
   source: 'openstreetmap' | 'curated' | 'demo';
   distanceMeters?: number;
+}
+
+export interface RoadsideAssistanceRequest {
+  serviceType: 'reboque' | 'bateria' | 'pneu' | 'combustivel';
+  vehicleType: string;
+  driverName: string;
+  driverPhone: string;
+  userCoordinates: Coordinates;
+  userAddress: string;
+  notes?: string;
 }
 
 export interface SafetyChecklistItem {
@@ -181,3 +215,4 @@ export interface CultureSpot {
   fullText: string;
   source: string;
 }
+

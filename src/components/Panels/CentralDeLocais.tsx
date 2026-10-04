@@ -25,6 +25,7 @@ interface CentralDeLocaisProps {
 
 export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
   onRouteToPlace,
+  userCoords,
 }) => {
   const [places, setPlaces] = useState<Place[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<PlaceCategory | 'all'>('all');
@@ -35,7 +36,7 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
     setLoading(true);
     try {
       const cat = selectedCategory === 'all' ? undefined : selectedCategory;
-      const data = await api.getPlaces(cat, searchQuery || undefined);
+      const data = await api.getPlaces(cat, searchQuery || undefined, userCoords);
       setPlaces(data);
     } catch (e) {
       console.error(e);
@@ -46,7 +47,7 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
 
   useEffect(() => {
     fetchPlaces();
-  }, [selectedCategory]);
+  }, [selectedCategory, userCoords]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,11 +56,17 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
 
   const categories = [
     { key: 'all', label: 'Todos os Locais', icon: <Building2 className="w-4 h-4" /> },
-    { key: 'saude', label: 'Saúde & Emergência', icon: <HeartPulse className="w-4 h-4 text-red-400" /> },
-    { key: 'comercio_servicos', label: 'Comércio & Serviços', icon: <ShoppingBag className="w-4 h-4 text-amber-400" /> },
-    { key: 'transporte_infraestrutura', label: 'Transporte & Terminais', icon: <Train className="w-4 h-4 text-blue-400" /> },
+    { key: 'posto_gnv', label: '⛽ Posto & GNV', icon: <Building2 className="w-4 h-4 text-cyan-400" /> },
+    { key: 'borracheiro', label: '🛞 Borracheiro 24h', icon: <Compass className="w-4 h-4 text-amber-400" /> },
+    { key: 'policia', label: '🚓 Polícia & DPO', icon: <AlertCircle className="w-4 h-4 text-blue-400" /> },
+    { key: 'saude', label: '🏥 Hospital & UPA', icon: <HeartPulse className="w-4 h-4 text-red-400" /> },
+    { key: 'reboque_socorro', label: '🛻 Reboque / Guincho', icon: <Navigation className="w-4 h-4 text-emerald-400" /> },
+    { key: 'bateria_auto', label: '🔋 SOS Baterias', icon: <Sparkles className="w-4 h-4 text-yellow-400" /> },
+    { key: 'comercio_servicos', label: 'Comércio & Serviços', icon: <ShoppingBag className="w-4 h-4 text-slate-300" /> },
+    { key: 'transporte_infraestrutura', label: 'Transporte & Terminais', icon: <Train className="w-4 h-4 text-blue-300" /> },
     { key: 'lazer_cultura', label: 'Lazer & Cultura', icon: <Compass className="w-4 h-4 text-purple-400" /> },
   ];
+
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-white shadow-2xl flex flex-col gap-4 max-w-4xl mx-auto">

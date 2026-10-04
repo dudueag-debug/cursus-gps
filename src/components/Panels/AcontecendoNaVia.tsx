@@ -282,7 +282,7 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
 
       {/* Discussion modal for the incident */}
       {selectedOccForChat && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-4 shadow-2xl flex flex-col gap-3 max-h-[85vh]">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <div>
@@ -346,7 +346,7 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
 
       {/* Modal: Relatar Nova Ocorrência */}
       {isReportingModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 shadow-2xl flex flex-col gap-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <h3 className="font-bold text-base text-white flex items-center gap-2">
@@ -364,17 +364,25 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
                 <select
                   value={newCategory}
                   onChange={e => setNewCategory(e.target.value as OccurrenceCategory)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-slate-200"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-slate-200 text-xs"
                 >
-                  <option value="buraco">Buraco / Pavimento Danificado (Risco a motos)</option>
-                  <option value="acidente">Acidente na Pista</option>
-                  <option value="obras">Obras / Fresagem / Recapeamento</option>
-                  <option value="alagamento">Ponto de Alagamento</option>
-                  <option value="oleo_pista">Óleo na Pista / Pista Escorregadia</option>
-                  <option value="semaforo_defeito">Semáforo com Defeito</option>
-                  <option value="congestionamento">Congestionamento Intenso</option>
-                  <option value="arvore_caida">Árvore ou Obstáculo na Via</option>
+                  <option value="engarrafamento">🚗 Engarrafamento / Trânsito Parado</option>
+                  <option value="alagamento">🌊 Ponto de Alagamento</option>
+                  <option value="buraco">🕳️ Buraco na Via / Pavimento Danificado</option>
+                  <option value="objeto_via">📦 Objeto / Obstáculo na Via</option>
+                  <option value="veiculo_parado">🛑 Veículo Parado / Quebrado na Pista</option>
+                  <option value="acidente">💥 Acidente de Trânsito</option>
+                  <option value="blitz">👮‍♂️ Blitz / Fiscalização Policial</option>
+                  <option value="via_parcialmente_interditada">⚠️ Via Parcialmente Interditada</option>
+                  <option value="via_interditada">⛔ Via Interditada (Fechada Totalmente)</option>
+                  <option value="acesso_fechado">🚫 Via de Acesso Fechada (Saídas e Entradas)</option>
+                  <option value="ponto_roubo">🚨 Ponto de Roubos / Área de Risco</option>
+                  <option value="local_perigoso">⚡ Identificar Local Perigoso</option>
+                  <option value="obras">🚧 Obras / Fresagem / Recapeamento</option>
+                  <option value="oleo_pista">🛢️ Óleo na Pista / Pista Escorregadia</option>
+                  <option value="semaforo_defeito">🚦 Semáforo com Defeito</option>
                 </select>
+
               </div>
 
               <div>
