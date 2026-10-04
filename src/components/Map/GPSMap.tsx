@@ -41,51 +41,65 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const map = L.map(mapContainerRef.current, {
-      center: [currentLocation.lat, currentLocation.lng],
-      zoom: 15,
-      zoomControl: false,
-      attributionControl: false,
-    });
+    if ((mapContainerRef.current as any)._leaflet_id) {
+      delete (mapContainerRef.current as any)._leaflet_id;
+    }
 
-    // High-tech dark Carto tile layer
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd',
-    }).addTo(map);
+    try {
+      const map = L.map(mapContainerRef.current, {
+        center: [currentLocation.lat, currentLocation.lng],
+        zoom: 15,
+        zoomControl: false,
+        attributionControl: false,
+      });
 
-    // Occurrences & Culture layer groups
-    const occGroup = L.layerGroup().addTo(map);
-    const culGroup = L.layerGroup().addTo(map);
-    occurrencesLayerGroupRef.current = occGroup;
-    cultureLayerGroupRef.current = culGroup;
+      // High-tech dark Carto tile layer
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd',
+      }).addTo(map);
 
-    // Vehicle Marker
-    const markerIcon = createVehicleDivIcon(
-      user.vehicleModel,
-      user.vehicleColor,
-      heading,
-      user.enableWindEffect,
-      isNavigating
-    );
-    const vMarker = L.marker([currentLocation.lat, currentLocation.lng], {
-      icon: markerIcon,
-      zIndexOffset: 1000,
-    }).addTo(map);
-    vehicleMarkerRef.current = vMarker;
+      // Occurrences & Culture layer groups
+      const occGroup = L.layerGroup().addTo(map);
+      const culGroup = L.layerGroup().addTo(map);
+      occurrencesLayerGroupRef.current = occGroup;
+      cultureLayerGroupRef.current = culGroup;
 
-    // Map click handler
-    map.on('click', (e: L.LeafletMouseEvent) => {
-      if (onMapClick) {
-        onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
-      }
-    });
+      // Vehicle Marker
+      const markerIcon = createVehicleDivIcon(
+        user.vehicleModel,
+        user.vehicleColor,
+        heading,
+        user.enableWindEffect,
+        isNavigating
+      );
+      const vMarker = L.marker([currentLocation.lat, currentLocation.lng], {
+        icon: markerIcon,
+        zIndexOffset: 1000,
+      }).addTo(map);
+      vehicleMarkerRef.current = vMarker;
 
-    mapRef.current = map;
+      // Map click handler
+      map.on('click', (e: L.LeafletMouseEvent) => {
+        if (onMapClick) {
+          onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
+        }
+      });
+
+      mapRef.current = map;
+    } catch (err) {
+      console.warn('[GPSMap] Aviso de inicialização cartográfica:', err);
+    }
 
     return () => {
-      map.remove();
-      mapRef.current = null;
+      try {
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+      } catch (e) {
+        console.warn('Cleanup map error:', e);
+      }
     };
   }, []);
 

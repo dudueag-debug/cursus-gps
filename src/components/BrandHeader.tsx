@@ -8,9 +8,10 @@ import {
   BookOpen, 
   User, 
   Radio,
-  Download
+  Download,
+  Mic
 } from 'lucide-react';
-import { UserProfile } from '../types';
+import type { UserProfile } from '../types';
 
 interface BrandHeaderProps {
   user: UserProfile;
@@ -18,6 +19,7 @@ interface BrandHeaderProps {
   setActivePanel: (panel: 'map' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile') => void;
   openSafetyModal: () => void;
   openInstallModal: () => void;
+  openVoiceModal: () => void;
   activeOccurrencesCount: number;
 }
 
@@ -27,6 +29,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
   setActivePanel,
   openSafetyModal,
   openInstallModal,
+  openVoiceModal,
   activeOccurrencesCount,
 }) => {
   return (
@@ -129,6 +132,16 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
           >
             <BookOpen className="w-4 h-4 text-purple-400" />
             <span className="hidden xl:inline">Cultura & História</span>
+          </button>
+
+          {/* Comando de Voz */}
+          <button
+            onClick={openVoiceModal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 shadow-sm active:scale-95 transition-all"
+            title="Comando de Voz Inteligente"
+          >
+            <Mic className="w-3.5 h-3.5 text-lime-400 animate-pulse" />
+            <span className="hidden md:inline">Voz</span>
           </button>
 
           {/* Baixar / Instalar App */}

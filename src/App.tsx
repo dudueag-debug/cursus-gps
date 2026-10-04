@@ -10,7 +10,9 @@ import { CultureModal } from './components/Panels/CultureModal';
 import { UserProfileModal } from './components/Panels/UserProfileModal';
 import { AuthModal } from './components/Panels/AuthModal';
 import { InstallAppModal } from './components/Panels/InstallAppModal';
+import { VoiceCommandModal } from './components/Navigation/VoiceCommandModal';
 import { SplashScreen } from './components/SplashScreen';
+import { useVoiceCommander } from './hooks/useVoiceCommander';
 import type { UserProfile, Coordinates, RouteOption, Occurrence, CultureSpot, Place } from './types';
 import { api } from './services/api';
 
@@ -70,7 +72,55 @@ export function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // Voice speech synthesis output
+  const speakText = (text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'pt-BR';
+      utterance.rate = 1.05;
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn('Speech synthesis error:', e);
+    }
+  };
+
+  // Voice Commander Hook
+  const handleVoiceDestination = async (query: string) => {
+    try {
+      const results = await api.geocode(query);
+      if (results && results.length > 0) {
+        const dest = results[0];
+        const data = await api.calculateRoute(currentLocation, dest.coordinates, user.preferredMode);
+        setRoutes(data.routes);
+        setSelectedRouteIndex(0);
+        setActivePanel('map');
+      } else {
+        speakText('Não encontrei o endereço exato, tente falar o nome de uma avenida ou bairro.');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const voice = useVoiceCommander({
+    onSearchDestination: handleVoiceDestination,
+    onStartNavigation: () => handleStartNavigation(),
+    onStopNavigation: () => handleExitNavigation(),
+    onOpenPanel: panel => {
+      if (panel === 'safety') setIsSafetyModalOpen(true);
+      else if (panel === 'culture') setIsCultureModalOpen(true);
+      else setActivePanel(panel);
+    },
+    onRecenterMap: () => {
+      // Map will recenter via GPS
+    },
+    onSpeakResponse: text => speakText(text),
+  });
 
   // Load Real Data, PWA install listener and Geolocation on mount
   useEffect(() => {
@@ -79,6 +129,7 @@ export function App() {
       setDeferredPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+
     // Try browser Geolocation API
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -111,6 +162,10 @@ export function App() {
     };
 
     loadData();
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
   }, []);
 
   const selectedRoute = routes[selectedRouteIndex] || null;
@@ -197,6 +252,10 @@ export function App() {
         }}
         openSafetyModal={() => setIsSafetyModalOpen(true)}
         openInstallModal={() => setIsInstallModalOpen(true)}
+        openVoiceModal={() => {
+          setIsVoiceModalOpen(true);
+          voice.startListening();
+        }}
         activeOccurrencesCount={occurrences.filter(o => !o.isNormalized).length}
       />
 
@@ -237,6 +296,10 @@ export function App() {
                 onRouteCalculated={handleRouteCalculated}
                 onSelectAlternative={idx => setSelectedRouteIndex(idx)}
                 onStartNavigation={handleStartNavigation}
+                onTriggerVoice={() => {
+                  setIsVoiceModalOpen(true);
+                  voice.startListening();
+                }}
               />
             )}
 
@@ -296,6 +359,24 @@ export function App() {
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
         deferredPrompt={deferredPrompt}
+      />
+
+      <VoiceCommandModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => {
+          voice.stopListening();
+          setIsVoiceModalOpen(false);
+        }}
+        isListening={voice.isListening}
+        transcript={voice.transcript}
+        lastActionMessage={voice.lastActionMessage}
+        onToggleListening={() => {
+          if (voice.isListening) voice.stopListening();
+          else voice.startListening();
+        }}
+        onExecuteSampleCommand={phrase => {
+          voice.processCommand(phrase);
+        }}
       />
     </div>
   );

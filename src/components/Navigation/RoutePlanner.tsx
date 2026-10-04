@@ -14,9 +14,10 @@ import {
   ChevronRight,
   Sparkles,
   MapPin,
-  CheckCircle2
+  CheckCircle2,
+  Mic
 } from 'lucide-react';
-import { TransportMode, RouteOption, GeocodeResult, Coordinates } from '../../types';
+import type { TransportMode, RouteOption, GeocodeResult, Coordinates } from '../../types';
 import { api } from '../../services/api';
 
 interface RoutePlannerProps {
@@ -26,6 +27,7 @@ interface RoutePlannerProps {
   selectedRoute: RouteOption | null;
   onSelectAlternative: (index: number) => void;
   routes: RouteOption[];
+  onTriggerVoice?: () => void;
   onSetDestinationFromExternal?: (coords: Coordinates, name: string) => void;
 }
 
@@ -36,6 +38,7 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
   selectedRoute,
   onSelectAlternative,
   routes,
+  onTriggerVoice,
 }) => {
   const [originText, setOriginText] = useState('Sua Localização Atual');
   const [originCoords, setOriginCoords] = useState<Coordinates>(currentLocation);
@@ -160,10 +163,22 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
               handleSearch(e.target.value, 'dest');
             }}
             onFocus={() => setActiveSearchField('dest')}
-            placeholder="Para onde você vai? (CEP ou endereço)"
-            className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-9 pr-8 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            placeholder="Para onde você vai? (Diga ou digite o CEP/endereço)"
+            className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-9 pr-16 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
-          <Search className="absolute right-2.5 w-4 h-4 text-slate-400" />
+          <div className="absolute right-2 flex items-center gap-1.5">
+            {onTriggerVoice && (
+              <button
+                type="button"
+                onClick={onTriggerVoice}
+                className="p-1 rounded-lg hover:bg-slate-800 text-lime-400 hover:text-lime-300 transition-colors"
+                title="Falar Destino por Voz"
+              >
+                <Mic className="w-4 h-4 animate-pulse" />
+              </button>
+            )}
+            <Search className="w-4 h-4 text-slate-400" />
+          </div>
         </div>
 
         {/* Search Autocomplete Suggestions Dropdown */}
