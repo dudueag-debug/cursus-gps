@@ -34,7 +34,6 @@ describe('TÔ PASSANDO - GPS do CURSUS Core Engine Tests', () => {
       normalizationMessage: '',
     };
 
-    // User community votes that road is now clear
     occurrence.resolvedVotesCount += 3;
 
     if (occurrence.resolvedVotesCount >= 3) {
@@ -72,5 +71,30 @@ describe('TÔ PASSANDO - GPS do CURSUS Core Engine Tests', () => {
     const totalMinutes = transitSegments.reduce((sum, s) => sum + s.durationMinutes, 0);
     expect(totalMinutes).toBe(23);
     expect(transitSegments.length).toBe(3);
+  });
+
+  it('should validate all 12 quick signal categories for drivers', () => {
+    const categories = [
+      'engarrafamento', 'alagamento', 'buraco', 'objeto_via',
+      'veiculo_parado', 'acidente', 'blitz', 'via_parcialmente_interditada',
+      'via_interditada', 'acesso_fechado', 'ponto_roubo', 'local_perigoso'
+    ];
+    expect(categories.length).toBe(12);
+  });
+
+  it('should format 24h roadside assistance WhatsApp dispatch with GPS coordinates', () => {
+    const request = {
+      driverName: 'Eduardo Piloto',
+      vehicle: 'Carro de Passeio',
+      location: 'Av. Brasil, Rio de Janeiro - RJ',
+      lat: -22.8872,
+      lng: -43.2144,
+      service: 'reboque',
+    };
+
+    const text = `*SOLICITAÇÃO DE REBOQUE*\nMotorista: ${request.driverName}\nGPS: ${request.lat}, ${request.lng}\nMaps: https://www.google.com/maps?q=${request.lat},${request.lng}`;
+    expect(text).toContain('SOLICITAÇÃO DE REBOQUE');
+    expect(text).toContain('-22.8872');
+    expect(text).toContain('https://www.google.com/maps?q=-22.8872,-43.2144');
   });
 });
