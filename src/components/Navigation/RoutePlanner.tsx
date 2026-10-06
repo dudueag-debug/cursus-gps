@@ -15,7 +15,11 @@ import {
   Sparkles,
   MapPin,
   CheckCircle2,
-  Mic
+  Mic,
+  Fuel,
+  Disc,
+  HeartPulse,
+  ShoppingCart
 } from 'lucide-react';
 import type { TransportMode, RouteOption, GeocodeResult, Coordinates } from '../../types';
 import { api } from '../../services/api';
@@ -43,7 +47,7 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [originText, setOriginText] = useState('Minha Localização Atual');
   const [originCoords, setOriginCoords] = useState<Coordinates>(currentLocation);
 
-  // Clean and empty search bar by default
+  // Clean destination input
   const [destText, setDestText] = useState('');
   const [destCoords, setDestCoords] = useState<Coordinates | null>(null);
 
@@ -76,16 +80,53 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
     }
   };
 
-  const handleSelectSuggestion = (item: GeocodeResult) => {
+  const handleSelectSuggestion = async (item: GeocodeResult) => {
     if (activeSearchField === 'dest') {
       setDestText(item.displayName);
       setDestCoords(item.coordinates);
+      setSearchSuggestions([]);
+      setActiveSearchField(null);
+      // Auto calculate route on selection
+      try {
+        setIsSearching(true);
+        const data = await api.calculateRoute(originCoords, item.coordinates, mode, { avoidTolls });
+        onRouteCalculated(data.routes, 0);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSearching(false);
+      }
     } else {
       setOriginText(item.displayName);
       setOriginCoords(item.coordinates);
+      setSearchSuggestions([]);
+      setActiveSearchField(null);
     }
-    setSearchSuggestions([]);
-    setActiveSearchField(null);
+  };
+
+  // Quick 1-tap quick destinations
+  const handleQuickDestinationSelect = async (query: string, label: string) => {
+    setDestText(label);
+    setIsSearching(true);
+    try {
+      const results = await api.geocode(query, originCoords);
+      if (results && results.length > 0) {
+        const target = results[0];
+        setDestCoords(target.coordinates);
+        const data = await api.calculateRoute(originCoords, target.coordinates, mode, { avoidTolls });
+        onRouteCalculated(data.routes, 0);
+      } else {
+        // Fallback target with nearby offset
+        const fallbackTarget = { lat: originCoords.lat + 0.015, lng: originCoords.lng + 0.012 };
+        setDestCoords(fallbackTarget);
+        const data = await api.calculateRoute(originCoords, fallbackTarget, mode, { avoidTolls });
+        onRouteCalculated(data.routes, 0);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleCalculateRoute = async () => {
@@ -191,8 +232,11 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
               handleSearch(e.target.value, 'dest');
             }}
             onFocus={() => setActiveSearchField('dest')}
-            placeholder="Para onde você vai? (Diga ou digite o CEP/endereço)"
-            className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-9 pr-16 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleCalculateRoute();
+            }}
+            placeholder="Para onde você vai? (Ex: Centro, Barra, CEP...)"
+            className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-9 pr-16 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
           />
           <div className="absolute right-2 flex items-center gap-1.5">
             {onTriggerVoice && (
@@ -211,7 +255,7 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
         {/* Search Autocomplete Suggestions Dropdown */}
         {searchSuggestions.length > 0 && (
-          <div className="absolute top-20 left-0 right-0 z-50 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl overflow-hidden divide-y divide-slate-800">
+          <div className="absolute top-20 left-0 right-0 z-50 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl overflow-hidden divide-y divide-slate-800 max-h-60 overflow-y-auto">
             {searchSuggestions.map(item => (
               <div
                 key={item.id}
@@ -233,6 +277,41 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
         )}
       </div>
 
+      {/* 1-Tap Quick Destination Chips */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+        <button
+          onClick={() => handleQuickDestinationSelect('Posto de Gasolina e GNV', 'Posto Mais Próximo')}
+          className="px-2.5 py-1 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 flex items-center gap-1 text-[11px] text-amber-300 shrink-0 active:scale-95 transition-all"
+        >
+          <Fuel className="w-3 h-3 text-amber-400" />
+          <span>Posto Próximo</span>
+        </button>
+
+        <button
+          onClick={() => handleQuickDestinationSelect('Borracheiro 24h', 'Borracheiro')}
+          className="px-2.5 py-1 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 flex items-center gap-1 text-[11px] text-orange-300 shrink-0 active:scale-95 transition-all"
+        >
+          <Disc className="w-3 h-3 text-orange-400" />
+          <span>Borracheiro</span>
+        </button>
+
+        <button
+          onClick={() => handleQuickDestinationSelect('UPA Pronto Socorro Hospital', 'UPA / Hospital')}
+          className="px-2.5 py-1 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 flex items-center gap-1 text-[11px] text-emerald-300 shrink-0 active:scale-95 transition-all"
+        >
+          <HeartPulse className="w-3 h-3 text-emerald-400" />
+          <span>Hospital / UPA</span>
+        </button>
+
+        <button
+          onClick={() => handleQuickDestinationSelect('Supermercado', 'Supermercado')}
+          className="px-2.5 py-1 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 flex items-center gap-1 text-[11px] text-purple-300 shrink-0 active:scale-95 transition-all"
+        >
+          <ShoppingCart className="w-3 h-3 text-purple-400" />
+          <span>Mercado</span>
+        </button>
+      </div>
+
       {/* Preferences & Calculate CTA */}
       <div className="flex items-center justify-between pt-1">
         <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-400 select-none">
@@ -248,7 +327,7 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
         <button
           onClick={handleCalculateRoute}
           disabled={isSearching}
-          className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-blue-500/25 active:scale-95 transition-all disabled:opacity-50"
+          className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:brightness-110 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg shadow-blue-500/25 active:scale-95 transition-all disabled:opacity-50"
         >
           {isSearching ? (
             <span className="animate-pulse">Calculando...</span>
@@ -269,7 +348,7 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
               Opções de Rota Disponíveis
             </span>
             <span className="text-[10px] text-lime-400 font-semibold">
-              Previsão Baseada em Dados
+              Previsão Inteligente
             </span>
           </div>
 
@@ -314,30 +393,12 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
             })}
           </div>
 
-          {/* Multimodal steps visualizer */}
-          {selectedRoute.multimodalSegments && (
-            <div className="bg-slate-950/60 rounded-xl p-2.5 border border-slate-800">
-              <p className="text-[11px] font-semibold text-slate-300 mb-2">Etapas Multimodais Integradas:</p>
-              <div className="flex flex-col gap-1.5 text-xs">
-                {selectedRoute.multimodalSegments.map((seg, idx) => (
-                  <div key={idx} className="flex items-center gap-2 text-slate-300">
-                    <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] text-lime-400 font-bold">
-                      {idx + 1}
-                    </span>
-                    <span>{seg.label}</span>
-                    <span className="ml-auto text-slate-500 font-medium">{seg.durationMinutes} min</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Action CTA to Start Navigation */}
           <button
             onClick={onStartNavigation}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-lime-400 via-lime-500 to-emerald-500 hover:from-lime-300 hover:to-emerald-400 text-slate-950 font-black text-sm tracking-wide shadow-xl shadow-lime-500/25 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-lime-400 via-lime-500 to-emerald-500 hover:brightness-110 text-slate-950 font-black text-sm tracking-wide shadow-xl shadow-lime-500/25 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
           >
-            <Navigation className="w-5 h-5 fill-slate-950" />
+            <Navigation className="w-4 h-4 fill-slate-950" />
             <span>INICIAR NAVEGAÇÃO GPS</span>
           </button>
         </div>

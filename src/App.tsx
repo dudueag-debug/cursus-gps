@@ -429,7 +429,11 @@ export function App() {
 
   // Trigger Navigation Start
   const handleStartNavigation = () => {
-    if (!selectedRoute) return;
+    if (!selectedRoute) {
+      setIsMobilePlannerOpen(true);
+      speakText('Escolha ou digite seu destino para iniciar a navegação.');
+      return;
+    }
 
     userService.addRouteToUserHistory(
       user.id,
@@ -439,11 +443,10 @@ export function App() {
       selectedRoute.totalDurationSeconds
     );
 
-    if (['car', 'motorcycle'].includes(selectedRoute.mode)) {
-      setIsSafetyModalOpen(true);
-    } else {
-      setIsNavigating(true);
-    }
+    setIsNavigating(true);
+    setActivePanel('map');
+    setIsMobilePlannerOpen(false);
+    speakText('Iniciando navegação GPS. Siga a rota indicada no mapa.');
   };
 
   const handleProceedFromSafety = () => {
@@ -457,10 +460,12 @@ export function App() {
       );
     }
     setIsNavigating(true);
+    setActivePanel('map');
   };
 
   const handleExitNavigation = () => {
     setIsNavigating(false);
+    speakText('Navegação finalizada.');
   };
 
   // Traçar rota a partir de um local encontrado

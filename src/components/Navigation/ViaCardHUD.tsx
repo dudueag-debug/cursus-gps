@@ -21,7 +21,9 @@ import {
   ChevronUp, 
   ChevronDown,
   Sparkles,
-  Info
+  Info,
+  Search,
+  CheckCircle2
 } from 'lucide-react';
 import type { Occurrence, Coordinates, PlaceCategory, WeatherData, TransportMode, RouteOption } from '../../types';
 
@@ -106,156 +108,140 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
   ];
 
   return (
-    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[calc(100%-1rem)] sm:w-[500px] max-w-lg z-30 select-none pointer-events-auto pb-[env(safe-area-inset-bottom)]">
-      <div className="bg-slate-950/90 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 flex flex-col shadow-black/80">
+    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[calc(100%-1rem)] sm:w-[480px] max-w-lg z-30 select-none pointer-events-auto pb-[env(safe-area-inset-bottom)]">
+      <div className="bg-slate-950/90 backdrop-blur-xl border border-slate-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 flex flex-col shadow-black/90">
         
         {/* Toast Feedback */}
         {reportSuccessToast && (
-          <div className="mx-3 mt-2 p-2 rounded-xl bg-cyan-400 text-slate-950 font-bold text-xs text-center animate-fade-in shadow-md">
+          <div className="mx-3 mt-2 p-1.5 rounded-xl bg-cyan-400 text-slate-950 font-bold text-xs text-center animate-fade-in shadow-md">
             {reportSuccessToast}
           </div>
         )}
 
-        {/* COMPACT & SLEEK MAIN BAR */}
-        <div className="px-4 py-2.5 flex items-center justify-between gap-3">
-          {/* Left: ETA & Live Status */}
+        {/* ULTRA-COMPACT SLIM FLOATING HUD BAR (Single row, takes minimal space) */}
+        <div className="px-3 py-2 flex items-center justify-between gap-2">
+          
+          {/* Left: Quick Destination / ETA info */}
           <div 
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="flex flex-col text-left cursor-pointer group"
+            onClick={selectedRoute ? () => setIsExpanded(!isExpanded) : onOpenRoutePlanner}
+            className="flex items-center gap-2 cursor-pointer group shrink min-w-0"
+            title={selectedRoute ? 'Clique para ver detalhes' : 'Buscar Destino'}
           >
-            <div className="flex items-center gap-2">
-              <span className="text-white font-extrabold text-xl sm:text-2xl tracking-tight group-hover:text-cyan-400 transition-colors">
-                {totalMinutes} min
-              </span>
-              <span className="text-[10px] font-semibold text-slate-400">
-                • {distanceKm} km
-              </span>
-            </div>
-            <div className="text-[11px] font-medium text-slate-400 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Chegada às {etaTime}</span>
-            </div>
+            {selectedRoute ? (
+              <div className="flex flex-col text-left leading-tight truncate">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-white font-extrabold text-sm sm:text-base tracking-tight group-hover:text-cyan-400 transition-colors">
+                    {totalMinutes} min
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-400">
+                    ({distanceKm} km)
+                  </span>
+                </div>
+                <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1 truncate">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="truncate">{selectedRoute.title || `Chegada às ${etaTime}`}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/50 transition-all text-slate-300">
+                <Search className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-xs font-semibold text-slate-200 truncate">Para onde vamos?</span>
+              </div>
+            )}
           </div>
 
-          {/* Right: Actions (Rotas & Navegar) */}
-          <div className="flex items-center gap-2">
+          {/* Center: 5 Discrete 1-Tap Micro Action Buttons */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            {/* 1. Postos */}
             <button
-              onClick={onOpenRoutePlanner}
-              className="px-3 py-2 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-200 text-xs font-semibold active:scale-95 transition-all shadow-sm flex items-center gap-1.5"
-              title="Buscar ou Traçar Rota"
+              onClick={() => onFindNearest?.('posto_gnv')}
+              className="w-8 h-8 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 flex items-center justify-center text-amber-400 active:scale-90 transition-all"
+              title="Posto de Combustível / GNV Mais Próximo"
             >
-              <RouteIcon className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Rotas</span>
+              <Fuel className="w-3.5 h-3.5" />
             </button>
 
+            {/* 2. Borracheiro */}
             <button
-              onClick={onStartNavigation}
-              className="px-4 py-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-white text-xs font-bold active:scale-95 transition-all shadow-lg shadow-cyan-500/25 flex items-center gap-1.5"
-              title="Iniciar Navegação com GPS"
+              onClick={() => onFindNearest?.('borracheiro')}
+              className="w-8 h-8 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/25 flex items-center justify-center text-orange-400 active:scale-90 transition-all"
+              title="Borracheiro Mais Próximo"
+            >
+              <Disc className="w-3.5 h-3.5" />
+            </button>
+
+            {/* 3. Polícia */}
+            <button
+              onClick={() => onFindNearest?.('policia')}
+              className="w-8 h-8 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/25 flex items-center justify-center text-blue-400 active:scale-90 transition-all"
+              title="Polícia / DPO Mais Próximo"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+            </button>
+
+            {/* 4. Saúde */}
+            <button
+              onClick={() => onFindNearest?.('saude')}
+              className="w-8 h-8 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 flex items-center justify-center text-emerald-400 active:scale-90 transition-all"
+              title="UPA / Hospital Mais Próximo"
+            >
+              <HeartPulse className="w-3.5 h-3.5" />
+            </button>
+
+            {/* 5. Sinalizar */}
+            <button
+              onClick={onOpenQuickSignals}
+              className="w-8 h-8 rounded-xl bg-red-600/20 hover:bg-red-600/40 border border-red-500/40 flex items-center justify-center text-red-400 active:scale-90 transition-all"
+              title="Sinalizar Alerta na Via"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+            </button>
+          </div>
+
+          {/* Right: Main Navigation Action Button & Drawer Toggle */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => {
+                if (selectedRoute && onStartNavigation) {
+                  onStartNavigation();
+                } else if (onOpenRoutePlanner) {
+                  onOpenRoutePlanner();
+                }
+              }}
+              className="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:brightness-110 text-white text-xs font-bold active:scale-95 transition-all shadow-md shadow-cyan-500/25 flex items-center gap-1.5"
+              title={selectedRoute ? 'Iniciar Navegação GPS em Tempo Real' : 'Escolher Destino para Navegar'}
             >
               <Navigation className="w-3.5 h-3.5 fill-white" />
-              <span>Navegar</span>
+              <span>{selectedRoute ? 'Navegar' : 'Rotas'}</span>
+            </button>
+
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-cyan-400 transition-colors"
+              title={isExpanded ? 'Recolher Painel' : 'Ver Mais Opções e Alertas'}
+            >
+              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
             </button>
           </div>
+
         </div>
 
-        {/* 5 CLEAN 1-TAP ESSENTIAL SHORTCUTS */}
-        <div className="px-3 py-2 grid grid-cols-5 gap-1.5 border-t border-slate-800/60 bg-slate-900/30">
-          {/* 1. Posto/GNV */}
-          <button
-            onClick={() => onFindNearest?.('posto_gnv')}
-            className="py-1.5 px-1 rounded-2xl hover:bg-slate-850 active:scale-95 transition-all flex flex-col items-center justify-center text-center group"
-            title="Posto de Gasolina e GNV"
-          >
-            <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-400 mb-1 group-hover:scale-105 transition-transform">
-              <Fuel className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-medium text-slate-300 truncate max-w-full">Postos</span>
-          </button>
-
-          {/* 2. Borracheiro */}
-          <button
-            onClick={() => onFindNearest?.('borracheiro')}
-            className="py-1.5 px-1 rounded-2xl hover:bg-slate-850 active:scale-95 transition-all flex flex-col items-center justify-center text-center group"
-            title="Borracheiro 24h"
-          >
-            <div className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/25 flex items-center justify-center text-orange-400 mb-1 group-hover:scale-105 transition-transform">
-              <Disc className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-medium text-slate-300 truncate max-w-full">Borracheiro</span>
-          </button>
-
-          {/* 3. Polícia */}
-          <button
-            onClick={() => onFindNearest?.('policia')}
-            className="py-1.5 px-1 rounded-2xl hover:bg-slate-850 active:scale-95 transition-all flex flex-col items-center justify-center text-center group"
-            title="Polícia e DPO"
-          >
-            <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 mb-1 group-hover:scale-105 transition-transform">
-              <ShieldAlert className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-medium text-slate-300 truncate max-w-full">Polícia</span>
-          </button>
-
-          {/* 4. Saúde */}
-          <button
-            onClick={() => onFindNearest?.('saude')}
-            className="py-1.5 px-1 rounded-2xl hover:bg-slate-850 active:scale-95 transition-all flex flex-col items-center justify-center text-center group"
-            title="UPA e Hospital"
-          >
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400 mb-1 group-hover:scale-105 transition-transform">
-              <HeartPulse className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-medium text-slate-300 truncate max-w-full">Saúde</span>
-          </button>
-
-          {/* 5. SINALIZAR */}
-          <button
-            onClick={onOpenQuickSignals}
-            className="py-1.5 px-1 rounded-2xl hover:bg-red-950/30 active:scale-95 transition-all flex flex-col items-center justify-center text-center group"
-            title="Sinalizar Ocorrência na Via"
-          >
-            <div className="w-8 h-8 rounded-xl bg-red-600/90 border border-red-500/40 flex items-center justify-center text-white mb-1 group-hover:scale-105 transition-transform shadow-md shadow-red-600/30 animate-pulse">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-bold text-red-400 truncate max-w-full">Sinalizar</span>
-          </button>
-        </div>
-
-        {/* EXPAND TOGGLE FOOTER */}
-        <div 
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full py-1 px-4 bg-slate-950/60 border-t border-slate-800/60 flex items-center justify-between cursor-pointer hover:bg-slate-900/60 transition-colors text-[10px] text-slate-400"
-        >
-          <div className="flex items-center gap-1.5">
-            <span className="text-cyan-400">⚡</span>
-            <span>{isExpanded ? 'Recolher Atalhos' : 'O que tem aqui, Clima, Transporte e Alertas'}</span>
-          </div>
-          <span className="flex items-center gap-0.5 text-cyan-400 font-semibold">
-            {isExpanded ? (
-              <><span>Fechar</span><ChevronDown className="w-3.5 h-3.5" /></>
-            ) : (
-              <><span>Mais</span><ChevronUp className="w-3.5 h-3.5" /></>
-            )}
-          </span>
-        </div>
-
-        {/* EXPANDABLE SECONDARY DRAWER */}
+        {/* EXPANDABLE SECONDARY DRAWER (Only visible when user explicitly expands) */}
         {isExpanded && (
-          <div className="flex flex-col p-3 gap-3 max-h-[46vh] overflow-y-auto border-t border-slate-800/80 bg-slate-950/95 animate-in fade-in duration-200 scrollbar-thin">
+          <div className="flex flex-col p-3 gap-3 max-h-[42vh] overflow-y-auto border-t border-slate-800/80 bg-slate-950/98 animate-in fade-in duration-200 scrollbar-thin">
             
             {/* Quick Discover Shortcuts */}
             <div className="grid grid-cols-5 gap-1.5 text-center">
               <button
-                onClick={onOpenOQueTemAqui}
+                onClick={() => { onOpenOQueTemAqui?.(); setIsExpanded(false); }}
                 className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-cyan-300"
               >
-                <Radar className="w-4 h-4 text-cyan-400 mb-0.5 animate-spin-slow" />
+                <Radar className="w-4 h-4 text-cyan-400 mb-0.5" />
                 <span className="text-[9px] font-medium">O Que Tem</span>
               </button>
 
               <button
-                onClick={onOpenWeatherModal}
+                onClick={() => { onOpenWeatherModal?.(); setIsExpanded(false); }}
                 className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-amber-300"
               >
                 <CloudSun className="w-4 h-4 text-amber-400 mb-0.5" />
@@ -263,7 +249,7 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
               </button>
 
               <button
-                onClick={() => onFindNearest?.('transporte_infraestrutura')}
+                onClick={() => { onFindNearest?.('transporte_infraestrutura'); setIsExpanded(false); }}
                 className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-sky-300"
               >
                 <Bus className="w-4 h-4 text-sky-400 mb-0.5" />
@@ -271,7 +257,7 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
               </button>
 
               <button
-                onClick={() => onFindNearest?.('mercado')}
+                onClick={() => { onFindNearest?.('mercado'); setIsExpanded(false); }}
                 className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-purple-300"
               >
                 <ShoppingCart className="w-4 h-4 text-purple-400 mb-0.5" />
@@ -279,7 +265,7 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
               </button>
 
               <button
-                onClick={onOpenConhecaEsteLugar}
+                onClick={() => { onOpenConhecaEsteLugar?.(); setIsExpanded(false); }}
                 className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-yellow-300"
               >
                 <Sparkles className="w-4 h-4 text-yellow-400 mb-0.5" />
@@ -292,7 +278,7 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
                 <span>Sinalizar Ocorrência Rápida</span>
                 <button
-                  onClick={onOpenQuickSignals}
+                  onClick={() => { onOpenQuickSignals?.(); setIsExpanded(false); }}
                   className="text-cyan-400 hover:underline text-[10px] font-bold"
                 >
                   Grade Completa ➔
@@ -304,7 +290,7 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
                   <button
                     key={sig.category}
                     onClick={() => handleQuickReportClick(sig.category, sig.label)}
-                    className={`p-2 rounded-xl border flex items-center gap-2 text-left active:scale-95 transition-all text-[10.5px] font-medium ${sig.color}`}
+                    className={`p-1.5 rounded-xl border flex items-center gap-1.5 text-left active:scale-95 transition-all text-[10px] font-medium ${sig.color}`}
                   >
                     <span>{sig.icon}</span>
                     <span className="truncate">{sig.label}</span>
@@ -317,7 +303,7 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
               <span>TÔ PASSANDO • GPS INTELIGENTE 4.0</span>
               <button
-                onClick={onOpenAboutApp}
+                onClick={() => { onOpenAboutApp?.(); setIsExpanded(false); }}
                 className="text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1"
               >
                 <Info className="w-3 h-3" />
