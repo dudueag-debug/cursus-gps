@@ -57,10 +57,20 @@ html, body, #root {
   box-shadow: none !important;
 }
 
-/* Noturno Futurista Neon Cyber Dark Map Tile Filter */
+/* Noturno Futurista — subtle neon boost on Carto dark tiles */
 .leaflet-tile-futuristic-dark {
-  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(130%) saturate(145%) !important;
+  filter: brightness(1.05) contrast(1.12) saturate(1.25) !important;
   background-color: #050B14 !important;
+}
+
+.leaflet-tile-pane .leaflet-layer.leaflet-tile-futuristic-dark,
+.leaflet-layer.leaflet-tile-futuristic-dark {
+  filter: brightness(1.05) contrast(1.12) saturate(1.25);
+}
+
+/* Ensure dark map container matches theme */
+.leaflet-container.tp-map-dark {
+  background: #050B14 !important;
 }
 
 /* Glow animation for critical warnings on highway */
