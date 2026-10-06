@@ -128,6 +128,30 @@ export const locationService = {
     try {
       const ipResult = await ipPromise;
       if (ipResult) {
+        // App is Brazil-first: if IP is outside BR, use Brasília so map/data stay consistent
+        const country = (ipResult.country || '').toLowerCase();
+        const isBrazil =
+          country.includes('brasil') ||
+          country.includes('brazil') ||
+          country === 'br' ||
+          (ipResult.coordinates.lat < 5 &&
+            ipResult.coordinates.lat > -34 &&
+            ipResult.coordinates.lng < -30 &&
+            ipResult.coordinates.lng > -75);
+
+        if (!isBrazil) {
+          const brFallback: LocationDetectionResult = {
+            coordinates: DEFAULT_COORDS,
+            city: 'Brasília',
+            state: 'DF',
+            country: 'Brasil',
+            source: 'fallback',
+            formatted: 'Brasília - DF',
+          };
+          localStorage.setItem('tp_user_location', JSON.stringify(brFallback));
+          return brFallback;
+        }
+
         localStorage.setItem('tp_user_location', JSON.stringify(ipResult));
         return ipResult;
       }
