@@ -26,10 +26,25 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-/* Fullscreen Leaflet map adjustments */
+/* Mobile Safe Area Inset Utility Classes for iOS Notch / Dynamic Island */
+.safe-top-header {
+  padding-top: max(0.65rem, env(safe-area-inset-top, 0px));
+}
+
+.safe-bottom-hud {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+.safe-x-pad {
+  padding-left: max(0.5rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.5rem, env(safe-area-inset-right, 0px));
+}
+
+/* Fullscreen Leaflet map adjustments - mobile touch gesture & Tailwind v4 img reset fix */
 .leaflet-container {
   width: 100% !important;
   height: 100% !important;
@@ -38,9 +53,35 @@ html, body, #root {
   font-family: inherit;
   isolation: isolate;
   z-index: 0 !important;
-  touch-action: pan-x pan-y !important;
+  touch-action: none !important;
+  cursor: grab;
 }
 
+.leaflet-container:active {
+  cursor: grabbing;
+}
+
+/* Crucial Tailwind CSS reset override for Leaflet map tiles */
+.leaflet-container img.leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
+  width: 256px !important;
+  height: 256px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: block !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+.leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.leaflet-tile-container {
+  pointer-events: none;
+}
 
 /* Ensure Leaflet controls and popups stay strictly bounded below app UI */
 .leaflet-top,
@@ -50,6 +91,26 @@ html, body, #root {
 
 .leaflet-pane {
   z-index: 10 !important;
+}
+
+.leaflet-tile-pane {
+  z-index: 2 !important;
+}
+
+.leaflet-overlay-pane {
+  z-index: 4 !important;
+}
+
+.leaflet-shadow-pane {
+  z-index: 5 !important;
+}
+
+.leaflet-marker-pane {
+  z-index: 6 !important;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 7 !important;
 }
 
 .leaflet-popup-pane {
@@ -64,8 +125,11 @@ html, body, #root {
 }
 
 /* Noturno Futurista Neon Cyber Dark Map Tile Filter */
-.leaflet-tile-futuristic-dark {
-  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(130%) saturate(145%) !important;
+.leaflet-tile-futuristic-dark,
+img.leaflet-tile.leaflet-tile-futuristic-dark,
+.leaflet-tile-pane img.leaflet-tile-futuristic-dark,
+.leaflet-layer img.leaflet-tile-futuristic-dark {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(140%) saturate(160%) !important;
   background-color: #050B14 !important;
 }
 

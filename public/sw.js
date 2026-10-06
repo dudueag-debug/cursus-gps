@@ -1,4 +1,4 @@
-const CACHE_NAME = 'to-passando-gps-v4';
+const CACHE_NAME = 'to-passando-gps-v6-fresh';
 const STATIC_ASSETS = [
   './manifest.json',
   './icon.svg',
@@ -8,12 +8,13 @@ const STATIC_ASSETS = [
 
 // Install: Cache static icons
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
         console.warn('[SW] Cache notice:', err);
       });
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -32,13 +33,13 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Network-First for HTML/Navigations so app updates immediately on phones
+// Fetch: Network-First with cache fallback for everything during development
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // Bypass all cross-origin requests (Leaflet tiles, OSM, APIs, etc.)
+  // Bypass cross-origin requests (Leaflet tiles, OSM, APIs, etc.)
   if (url.origin !== self.location.origin) {
     return;
   }
@@ -48,39 +49,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML navigation requests: ALWAYS NETWORK-FIRST to prevent stale bundle hashes
-  if (
-    event.request.mode === 'navigate' ||
-    url.pathname === '/' ||
-    url.pathname.endsWith('index.html')
-  ) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match('./index.html') || caches.match('/'))
-    );
-    return;
-  }
-
-  // Static assets (JS, CSS, images): Cache-first with network fallback
+  // Always Network-First so mobile phones get live updates without cache freezing
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then((networkResponse) => {
+    fetch(event.request)
+      .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const clone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return networkResponse;
-      });
-    })
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html') || caches.match('/');
+          }
+          return new Response('Offline', { status: 503, statusText: 'Offline' });
+        });
+      })
   );
 });

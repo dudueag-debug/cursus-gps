@@ -5,141 +5,208 @@ export interface LocationDetectionResult {
   city: string;
   state: string;
   country: string;
-  source: 'gps' | 'ip' | 'fallback';
+  road?: string;
+  suburb?: string;
+  source: 'gps' | 'ip' | 'fallback' | 'cached';
+  accuracyMeters?: number;
   formatted: string;
 }
 
-// Fallback to Brasília / Central Brasil if completely offline
+// Default baseline coordinates (Brazil center if nothing else available)
 const DEFAULT_COORDS: Coordinates = {
-  lat: -15.793889,
-  lng: -47.882778,
+  lat: -22.906424,
+  lng: -43.182231,
 };
 
 export const locationService = {
   /**
-   * Automatically detect user's current location in Brazil via GPS or IP
+   * Get cached user location from localStorage if available
    */
-  async detectUserLocation(): Promise<LocationDetectionResult> {
-    // 1. Check if user already had a saved location from previous session
-    const cached = localStorage.getItem('tp_user_location');
-    let fallbackResult: LocationDetectionResult = {
-      coordinates: DEFAULT_COORDS,
-      city: 'Sua Localização',
-      state: 'Brasil',
-      country: 'Brasil',
-      source: 'fallback',
-      formatted: 'Localização Atual • GPS',
-    };
+  getCachedLocation(): LocationDetectionResult | null {
+    try {
+      const cached = localStorage.getItem('tp_user_location');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.coordinates && typeof parsed.coordinates.lat === 'number') {
+          return { ...parsed, source: 'cached' };
+        }
+      }
+    } catch {}
+    return null;
+  },
 
-    if (cached) {
-      try {
-        fallbackResult = JSON.parse(cached);
-      } catch {}
+  /**
+   * Automatically detect user's current live location anywhere in Brazil via GPS hardware or IP
+   * Fires onUpdate immediately whenever a faster or more precise tier resolves!
+   */
+  async detectUserLocation(onUpdate?: (res: LocationDetectionResult) => void): Promise<LocationDetectionResult> {
+    const cached = this.getCachedLocation();
+    if (cached && onUpdate) {
+      onUpdate(cached);
     }
 
-    // 2. Race GPS and Online IP detection
-    const gpsPromise = new Promise<Coordinates>((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation não suportada'));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          resolve({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          });
-        },
-        err => reject(err),
-        {
-          enableHighAccuracy: true,
-          timeout: 4000,
-          maximumAge: 60000,
-        }
-      );
-    });
-
-    const ipPromise = (async (): Promise<LocationDetectionResult | null> => {
+    // Fast IP Geolocation Stream
+    const fetchIpLocation = async (): Promise<LocationDetectionResult | null> => {
       try {
-        // Option A: ipwho.is (fast, HTTPS, CORS open, no token required)
-        const res = await fetch('https://ipwho.is/?lang=pt-BR');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch('https://ipwho.is/?lang=pt-BR', { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (res.ok) {
           const data = await res.json();
           if (data && data.success && data.latitude && data.longitude) {
-            return {
+            const cityName = data.city || 'Sua Cidade';
+            const stateCode = data.region_code || data.region || 'BR';
+            const result: LocationDetectionResult = {
               coordinates: { lat: data.latitude, lng: data.longitude },
-              city: data.city || 'Sua Cidade',
-              state: data.region_code || data.region || 'BR',
+              city: cityName,
+              state: stateCode,
               country: data.country || 'Brasil',
               source: 'ip',
-              formatted: `${data.city || 'Sua Cidade'} - ${data.region_code || data.region || 'BR'}`,
+              formatted: `${cityName} - ${stateCode}`,
             };
+            return result;
           }
         }
       } catch {}
 
       try {
-        // Option B: geojs.io fallback
-        const res2 = await fetch('https://get.geojs.io/v1/ip/geo.json');
+        const controller2 = new AbortController();
+        const timeoutId2 = setTimeout(() => controller2.abort(), 3500);
+        const res2 = await fetch('https://get.geojs.io/v1/ip/geo.json', { signal: controller2.signal });
+        clearTimeout(timeoutId2);
         if (res2.ok) {
           const data2 = await res2.json();
           if (data2 && data2.latitude && data2.longitude) {
-            return {
+            const cityName = data2.city || 'Sua Cidade';
+            const stateCode = data2.region || 'BR';
+            const result: LocationDetectionResult = {
               coordinates: { lat: parseFloat(data2.latitude), lng: parseFloat(data2.longitude) },
-              city: data2.city || 'Brasil',
-              state: data2.region || 'BR',
+              city: cityName,
+              state: stateCode,
               country: data2.country || 'Brasil',
               source: 'ip',
-              formatted: `${data2.city || 'Localidade'} - ${data2.region || 'BR'}`,
+              formatted: `${cityName} - ${stateCode}`,
             };
+            return result;
           }
         }
       } catch {}
 
       return null;
-    })();
+    };
 
+    // Fast Hardware GPS Stream
+    const fetchGpsPosition = (): Promise<{ coords: Coordinates; accuracy?: number }> => {
+      return new Promise((resolve, reject) => {
+        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+          return reject(new Error('Geolocation API não disponível'));
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            if (pos && pos.coords && typeof pos.coords.latitude === 'number' && typeof pos.coords.longitude === 'number') {
+              resolve({
+                coords: {
+                  lat: pos.coords.latitude,
+                  lng: pos.coords.longitude,
+                },
+                accuracy: pos.coords.accuracy,
+              });
+            } else {
+              reject(new Error('Coordenadas vazias retornadas'));
+            }
+          },
+          err => reject(err),
+          {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0,
+          }
+        );
+      });
+    };
+
+    let hasGpsResolved = false;
+
+    // Launch IP stream in background for ultra-fast response (100-300ms)
+    const ipPromise = fetchIpLocation().then(ipRes => {
+      if (ipRes && !hasGpsResolved) {
+        if (onUpdate) onUpdate(ipRes);
+        localStorage.setItem('tp_user_location', JSON.stringify(ipRes));
+      }
+      return ipRes;
+    }).catch(() => null);
+
+    // Launch GPS stream in parallel
     try {
-      // Try GPS first
-      const gpsCoords = await Promise.race([
-        gpsPromise,
-        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Timeout GPS')), 4500)),
-      ]);
-
-      if (gpsCoords) {
-        // Reverse geocode with Nominatim to obtain Brazilian State and City
-        const reverseInfo = await this.reverseGeocode(gpsCoords);
+      const gpsResult = await fetchGpsPosition();
+      if (gpsResult && gpsResult.coords) {
+        hasGpsResolved = true;
         const result: LocationDetectionResult = {
-          coordinates: gpsCoords,
-          city: reverseInfo.city,
-          state: reverseInfo.state,
+          coordinates: gpsResult.coords,
+          city: cached?.city || 'Sua Cidade',
+          state: cached?.state || 'BR',
           country: 'Brasil',
           source: 'gps',
-          formatted: `${reverseInfo.city} - ${reverseInfo.state}`,
+          accuracyMeters: gpsResult.accuracy,
+          formatted: 'Sua Localização Exata • GPS Ao Vivo',
         };
+
+        if (onUpdate) onUpdate(result);
         localStorage.setItem('tp_user_location', JSON.stringify(result));
+        localStorage.setItem('tp_confirmed_gps_coords', JSON.stringify(gpsResult.coords));
+
+        // Background reverse geocode for exact Brazilian street and neighborhood
+        this.reverseGeocode(gpsResult.coords).then(rev => {
+          const displayName = rev.road 
+            ? `${rev.road}, ${rev.city}` 
+            : `${rev.city} - ${rev.state}`;
+          const enrichedResult: LocationDetectionResult = {
+            ...result,
+            city: rev.city,
+            state: rev.state,
+            road: rev.road,
+            suburb: rev.suburb,
+            formatted: displayName,
+          };
+          if (onUpdate) onUpdate(enrichedResult);
+          localStorage.setItem('tp_user_location', JSON.stringify(enrichedResult));
+        }).catch(() => {});
+
         return result;
       }
-    } catch {
-      // GPS timed out or denied, wait for IP geolocation
+    } catch (e) {
+      console.warn('GPS hardware direct acquisition note:', e);
     }
 
-    try {
-      const ipResult = await ipPromise;
-      if (ipResult) {
-        localStorage.setItem('tp_user_location', JSON.stringify(ipResult));
-        return ipResult;
-      }
-    } catch {}
+    // If GPS did not resolve, check IP stream result
+    const ipRes = await ipPromise;
+    if (ipRes) {
+      return ipRes;
+    }
 
+    if (cached) {
+      return cached;
+    }
+
+    // Default baseline coordinates
+    const fallbackResult: LocationDetectionResult = {
+      coordinates: DEFAULT_COORDS,
+      city: 'Brasil',
+      state: 'GPS',
+      country: 'Brasil',
+      source: 'fallback',
+      formatted: 'Sua Localização • GPS',
+    };
+    if (onUpdate) onUpdate(fallbackResult);
     return fallbackResult;
   },
 
   /**
-   * Reverse geocode coordinates to Brazilian City and State
+   * Reverse geocode coordinates to Brazilian Street, Neighborhood, City and State
    */
-  async reverseGeocode(coords: Coordinates): Promise<{ city: string; state: string; road?: string }> {
+  async reverseGeocode(coords: Coordinates): Promise<{ city: string; state: string; road?: string; suburb?: string }> {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}&addressdetails=1`
@@ -147,14 +214,16 @@ export const locationService = {
       if (res.ok) {
         const data = await res.json();
         const addr = data.address || {};
-        const city = addr.city || addr.town || addr.municipality || addr.village || 'Sua Cidade';
+        const city = addr.city || addr.town || addr.municipality || addr.village || addr.county || 'Sua Cidade';
         const state = addr.state_code || addr.state || 'BR';
-        const road = addr.road || addr.pedestrian || addr.suburb;
-        return { city, state, road };
+        const road = addr.road || addr.pedestrian || addr.street;
+        const suburb = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district;
+        return { city, state, road, suburb };
       }
     } catch (e) {
-      console.warn('Reverse geocode error:', e);
+      console.warn('Reverse geocode notice:', e);
     }
-    return { city: 'Localização Atual', state: 'Brasil' };
+    return { city: 'Minha Localização', state: 'Brasil' };
   },
 };
+

@@ -97,4 +97,35 @@ describe('TÔ PASSANDO - GPS do CURSUS Core Engine Tests', () => {
     expect(text).toContain('-22.8872');
     expect(text).toContain('https://www.google.com/maps?q=-22.8872,-43.2144');
   });
+
+  it('should calculate weather rain alerts and advice for drivers and motorcyclists', async () => {
+    const { weatherService } = await import('../src/services/weatherService');
+    const weather = await weatherService.getWeather({ lat: -23.5505, lng: -46.6333 }, 'São Paulo', 'SP');
+
+    expect(weather).toBeDefined();
+    expect(weather.city).toBe('São Paulo');
+    expect(weather.weeklyForecast.length).toBe(7);
+    expect(weather.monthlySummary).toBeDefined();
+    expect(weather.monthlySummary.monthName).toBeDefined();
+    expect(weather.driverAdvice.car.length).toBeGreaterThan(0);
+    expect(weather.driverAdvice.motorcycle.length).toBeGreaterThan(0);
+    expect(weather.driverAdvice.motorcycle.some(d => d.includes('Faixas') || d.includes('faixas'))).toBe(true);
+  }, 12000);
+
+  it('should retrieve nearest locations for Gas/GNV, 24h Tire repair, and Police', async () => {
+    const { api } = await import('../src/services/api');
+    const userCoords = { lat: -22.9064, lng: -43.1822 };
+
+    const gnvPlaces = await api.getPlaces('posto_gnv', undefined, userCoords);
+    expect(gnvPlaces.length).toBeGreaterThan(0);
+    expect(gnvPlaces.some(p => p.category === 'posto_gnv')).toBe(true);
+
+    const tirePlaces = await api.getPlaces('borracheiro', undefined, userCoords);
+    expect(tirePlaces.length).toBeGreaterThan(0);
+    expect(tirePlaces.some(p => p.category === 'borracheiro')).toBe(true);
+
+    const policePlaces = await api.getPlaces('policia', undefined, userCoords);
+    expect(policePlaces.length).toBeGreaterThan(0);
+    expect(policePlaces.some(p => p.category === 'policia')).toBe(true);
+  });
 });

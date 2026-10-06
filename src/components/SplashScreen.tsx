@@ -10,37 +10,50 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onEnterApp }) => {
   const [loadingPhase, setLoadingPhase] = useState('Iniciando sensores do GPS...');
 
   useEffect(() => {
-    // Smooth loading progression
+    // Fast, smooth loading progression
     const interval = setInterval(() => {
       setProgress((prev) => {
-        const next = prev + 2.5;
+        const next = prev + 6;
         if (next >= 100) {
           clearInterval(interval);
           setTimeout(() => {
             onEnterApp();
-          }, 450);
+          }, 150);
           return 100;
         }
 
-        if (next < 25) {
+        if (next < 30) {
           setLoadingPhase('Conectando à rede de satélites GPS...');
-        } else if (next < 55) {
+        } else if (next < 60) {
           setLoadingPhase('Carregando mapa multimodal do Brasil...');
-        } else if (next < 80) {
-          setLoadingPhase('Sincronizando alertas da via e radares em tempo real...');
+        } else if (next < 85) {
+          setLoadingPhase('Sincronizando alertas da via e radares...');
         } else {
-          setLoadingPhase('TÔ PASSANDO calibrado. Boa viagem!');
+          setLoadingPhase('TÔ PASSANDO pronto. Boa viagem!');
         }
 
         return next;
       });
-    }, 55);
+    }, 30);
 
-    return () => clearInterval(interval);
+    // Guaranteed fallback timer so mobile never freezes on splash
+    const fallbackTimeout = setTimeout(() => {
+      clearInterval(interval);
+      onEnterApp();
+    }, 850);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(fallbackTimeout);
+    };
   }, [onEnterApp]);
 
   return (
-    <div className="fixed inset-0 z-[99999] bg-slate-950 flex flex-col items-center justify-between p-6 overflow-hidden select-none">
+    <div 
+      onClick={onEnterApp}
+      onTouchStart={onEnterApp}
+      className="fixed inset-0 z-[99999] bg-slate-950 flex flex-col items-center justify-between p-6 overflow-hidden select-none cursor-pointer"
+    >
       {/* Background Cyber Horizon & Perspective Highway */}
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
         {/* Radial glow */}
@@ -107,14 +120,14 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onEnterApp }) => {
               <svg viewBox="0 0 120 60" className="w-28 h-14" fill="none">
                 <defs>
                   <linearGradient id="splashCarBody" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stop-color="#0284c7" />
-                    <stop offset="30%" stop-color="#CCFF00" />
-                    <stop offset="70%" stop-color="#00D2FF" />
-                    <stop offset="100%" stop-color="#0066FF" />
+                    <stop offset="0%" stopColor="#0284c7" />
+                    <stop offset="30%" stopColor="#CCFF00" />
+                    <stop offset="70%" stopColor="#00D2FF" />
+                    <stop offset="100%" stopColor="#0066FF" />
                   </linearGradient>
                   <linearGradient id="splashGlass" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#0284c7" />
-                    <stop offset="100%" stop-color="#050B14" />
+                    <stop offset="0%" stopColor="#0284c7" />
+                    <stop offset="100%" stopColor="#050B14" />
                   </linearGradient>
                 </defs>
 
@@ -122,16 +135,16 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onEnterApp }) => {
                 <ellipse cx="60" cy="52" rx="48" ry="6" fill="#000000" opacity="0.9" />
 
                 {/* Wheels */}
-                <circle cx="30" cy="48" r="9" fill="#090d16" stroke="#475569" stroke-width="2.5" />
+                <circle cx="30" cy="48" r="9" fill="#090d16" stroke="#475569" strokeWidth="2.5" />
                 <circle cx="30" cy="48" r="4.5" fill="#CCFF00" />
-                <circle cx="90" cy="48" r="9" fill="#090d16" stroke="#475569" stroke-width="2.5" />
+                <circle cx="90" cy="48" r="9" fill="#090d16" stroke="#475569" strokeWidth="2.5" />
                 <circle cx="90" cy="48" r="4.5" fill="#CCFF00" />
 
                 {/* Aerodynamic Body Contour */}
-                <path d="M12 44 L20 44 L24 40 L36 40 L40 44 L80 44 L84 40 L96 40 L100 44 L114 44 C116 42, 116 38, 110 34 L92 24 C86 21, 62 18, 48 20 L30 28 L14 36 Z" fill="url(#splashCarBody)" stroke="#090d16" stroke-width="1.8" />
+                <path d="M12 44 L20 44 L24 40 L36 40 L40 44 L80 44 L84 40 L96 40 L100 44 L114 44 C116 42, 116 38, 110 34 L92 24 C86 21, 62 18, 48 20 L30 28 L14 36 Z" fill="url(#splashCarBody)" stroke="#090d16" strokeWidth="1.8" />
 
                 {/* Windshield & Cabin Glass */}
-                <path d="M48 22 L70 22 C78 22, 88 25, 90 28 L52 28 Z" fill="url(#splashGlass)" stroke="#0284c7" stroke-width="1" />
+                <path d="M48 22 L70 22 C78 22, 88 25, 90 28 L52 28 Z" fill="url(#splashGlass)" stroke="#0284c7" strokeWidth="1" />
 
                 {/* LED Headlight Laser */}
                 <polygon points="112,36 116,36 114,40 110,40" fill="#ffffff" />

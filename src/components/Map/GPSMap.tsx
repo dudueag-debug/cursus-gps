@@ -15,7 +15,14 @@ interface GPSMapProps {
   onSelectOccurrence: (occ: Occurrence) => void;
   onSelectCultureSpot: (spot: CultureSpot) => void;
   onMapClick?: (coords: Coordinates) => void;
+  onUpdateLocation?: (coords: Coordinates) => void;
+  onOpenWeather?: () => void;
+  onOpenSocorro?: () => void;
+  onOpenOccurrences?: () => void;
+  onFindCategory?: (category: any) => void;
+  onOpenPlacesPanel?: () => void;
   isSplashActive?: boolean;
+  activePanel?: string;
 }
 
 export const GPSMap: React.FC<GPSMapProps> = ({
@@ -30,6 +37,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   onSelectCultureSpot,
   onMapClick,
   isSplashActive = false,
+  activePanel = 'map',
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -45,41 +53,63 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   const [is3DMode, setIs3DMode] = useState<boolean>(user.is3DMode || false);
   const [showLayerMenu, setShowLayerMenu] = useState<boolean>(false);
 
-  // Layer URL Definitions
+  // Professional Watermark-Free Layer Definitions for Brazil & Worldwide
   const getLayerConfig = (layer: MapLayerType) => {
     switch (layer) {
       case 'satellite':
         return {
           url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           maxZoom: 19,
-          subdomains: 'abc',
-          attribution: 'Tiles &copy; Esri World Imagery &bull; TÔ PASSANDO',
+          className: '',
+          attribution: '&copy; Esri World Imagery &bull; TÔ PASSANDO',
         };
       case 'topo':
         return {
-          url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-          maxZoom: 17,
-          subdomains: 'abc',
-          attribution: '&copy; OpenTopoMap contributors &bull; TÔ PASSANDO',
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+          maxZoom: 19,
+          className: '',
+          attribution: '&copy; Esri Topo &bull; TÔ PASSANDO',
         };
       case 'dark':
         return {
-          url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           maxZoom: 19,
-          subdomains: 'abc',
           className: 'leaflet-tile-futuristic-dark',
           attribution: '&copy; OpenStreetMap contributors &bull; TÔ PASSANDO Noturno Futurista',
         };
       case 'streets':
       default:
         return {
-          url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           maxZoom: 19,
-          subdomains: 'abc',
           className: '',
           attribution: '&copy; OpenStreetMap contributors &bull; TÔ PASSANDO',
         };
     }
+  };
+
+  const createSafeTile = (layer: MapLayerType) => {
+    const config = getLayerConfig(layer);
+    const tile = L.tileLayer(config.url, {
+      maxZoom: config.maxZoom,
+      attribution: config.attribution,
+      className: config.className,
+      crossOrigin: true,
+      keepBuffer: 8,
+      updateWhenIdle: false,
+    });
+
+    // Fallback on tile error to standard OSM
+    tile.on('tileerror', (e: any) => {
+      const img = e.tile;
+      if (img && !img.dataset.fallback) {
+        img.dataset.fallback = 'true';
+        const { z, x, y } = e.coords;
+        img.src = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+      }
+    });
+
+    return tile;
   };
 
   // Switch Tile Layer dynamically
@@ -91,14 +121,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       mapRef.current.removeLayer(tileLayerRef.current);
     }
 
-    const config = getLayerConfig(newLayer);
-    const newTile = L.tileLayer(config.url, {
-      maxZoom: config.maxZoom,
-      attribution: config.attribution,
-      subdomains: config.subdomains || 'abc',
-      className: (config as any).className || '',
-    }).addTo(mapRef.current);
-
+    const newTile = createSafeTile(newLayer).addTo(mapRef.current);
     tileLayerRef.current = newTile;
   };
 
@@ -115,17 +138,14 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         center: [currentLocation.lat, currentLocation.lng],
         zoom: 15,
         zoomControl: false,
-        attributionControl: true,
+        attributionControl: false,
+        touchZoom: true,
+        dragging: true,
+        preferCanvas: true,
       });
 
       // Base tile layer
-      const config = getLayerConfig(activeLayer);
-      const baseTile = L.tileLayer(config.url, {
-        maxZoom: config.maxZoom,
-        attribution: config.attribution,
-        subdomains: config.subdomains || 'abc',
-        className: (config as any).className || '',
-      }).addTo(map);
+      const baseTile = createSafeTile(activeLayer).addTo(map);
       tileLayerRef.current = baseTile;
 
       // Occurrences & Culture layer groups
@@ -169,15 +189,10 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       invalidate();
       setTimeout(invalidate, 100);
       setTimeout(invalidate, 300);
-      setTimeout(invalidate, 600);
-      setTimeout(invalidate, 1200);
-      setTimeout(invalidate, 2500);
+      setTimeout(invalidate, 700);
+      setTimeout(invalidate, 1500);
 
       window.addEventListener('resize', invalidate);
-      window.addEventListener('orientationchange', () => {
-        setTimeout(invalidate, 200);
-        setTimeout(invalidate, 800);
-      });
 
       if (mapContainerRef.current && window.ResizeObserver) {
         const ro = new ResizeObserver(() => {
@@ -201,7 +216,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     };
   }, []);
 
-  // Recalculate map dimensions when splash screen is dismissed or when switching layers
+  // Recalculate map dimensions when splash screen is dismissed
   useEffect(() => {
     if (!isSplashActive && mapRef.current) {
       const invalidate = () => {
@@ -213,10 +228,22 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       setTimeout(invalidate, 100);
       setTimeout(invalidate, 300);
       setTimeout(invalidate, 600);
-      setTimeout(invalidate, 1000);
     }
   }, [isSplashActive]);
 
+  // Recalculate map dimensions when returning to map tab
+  useEffect(() => {
+    if (activePanel === 'map' && mapRef.current) {
+      const invalidate = () => {
+        try {
+          mapRef.current?.invalidateSize();
+        } catch {}
+      };
+      invalidate();
+      setTimeout(invalidate, 50);
+      setTimeout(invalidate, 250);
+    }
+  }, [activePanel]);
 
   // Recenter map when currentLocation changes substantially (e.g. initial online detection)
   useEffect(() => {

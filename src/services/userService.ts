@@ -68,6 +68,7 @@ export const userService = {
           shareLocationWithCommunity: true,
           saveRouteHistory: true,
           anonymousReports: false,
+          locationPermissionGranted: true,
           ...privateData.preferences?.privacy,
         },
         accessibility: {

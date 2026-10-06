@@ -1,359 +1,334 @@
 import React, { useState } from 'react';
 import { 
-  AlertTriangle, 
-  ChevronDown, 
-  ChevronUp, 
-  ThumbsUp, 
-  MapPin, 
-  Plus, 
   Fuel, 
   Disc, 
   ShieldAlert, 
   HeartPulse, 
-  Truck, 
-  BatteryCharging, 
+  Bus, 
+  ShoppingCart, 
+  CloudSun, 
+  Radar, 
+  AlertTriangle, 
+  Navigation, 
+  Route as RouteIcon, 
+  Car, 
+  Droplets, 
+  Package, 
+  AlertOctagon, 
+  Flame, 
+  Siren, 
+  AlertCircle, 
+  ChevronUp, 
+  ChevronDown,
   Sparkles,
-  Zap
+  Info
 } from 'lucide-react';
-import type { Occurrence, Coordinates, PlaceCategory } from '../../types';
+import type { Occurrence, Coordinates, PlaceCategory, WeatherData, TransportMode, RouteOption } from '../../types';
 
 interface ViaCardHUDProps {
   occurrences: Occurrence[];
   currentLocation: Coordinates;
+  weatherData?: WeatherData | null;
+  userPreferredMode?: TransportMode;
+  selectedRoute?: RouteOption | null;
+  onStartNavigation?: () => void;
   onSelectOccurrence: (occ: Occurrence) => void;
   onOpenReportModal?: () => void;
   onOpenQuickSignals?: () => void;
   onOpenSocorroModal?: () => void;
+  onOpenWeatherModal?: () => void;
+  onOpenRoutePlanner?: () => void;
+  onOpenPlacesPanel?: () => void;
   onFindNearest?: (category: PlaceCategory) => void;
+  onQuickReport?: (category: string, title: string) => void;
+  onQuickDestination?: (type: 'home' | 'work' | 'saved') => void;
   onConfirmOccurrence?: (id: string) => void;
+  onOpenOQueTemAqui?: () => void;
+  onOpenConhecaEsteLugar?: () => void;
+  onOpenAboutApp?: () => void;
 }
 
 export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
   occurrences,
   currentLocation,
-  onSelectOccurrence,
-  onOpenReportModal,
+  weatherData,
+  selectedRoute,
+  onStartNavigation,
   onOpenQuickSignals,
-  onOpenSocorroModal,
+  onOpenWeatherModal,
+  onOpenRoutePlanner,
   onFindNearest,
-  onConfirmOccurrence,
+  onQuickReport,
+  onOpenOQueTemAqui,
+  onOpenConhecaEsteLugar,
+  onOpenAboutApp,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'radars' | 'hazards' | 'traffic' | 'security'>('all');
-  const [confirmedIds, setConfirmedIds] = useState<string[]>([]);
+  const [reportSuccessToast, setReportSuccessToast] = useState<string | null>(null);
 
-  // Filter occurrences
-  const filtered = occurrences.filter(occ => {
-    if (occ.isNormalized) return false;
-    if (selectedFilter === 'radars') return ['blitz', 'radar', 'policia'].includes(occ.category);
-    if (selectedFilter === 'hazards') return ['buraco', 'oleo_pista', 'alagamento', 'objeto_via', 'arvore_caida'].includes(occ.category);
-    if (selectedFilter === 'traffic') return ['engarrafamento', 'acidente', 'obras', 'veiculo_parado', 'via_interditada', 'via_parcialmente_interditada', 'acesso_fechado'].includes(occ.category);
-    if (selectedFilter === 'security') return ['ponto_roubo', 'local_perigoso'].includes(occ.category);
-    return true;
-  });
+  // Dynamic ETA calculations
+  const totalMinutes = selectedRoute 
+    ? Math.round(selectedRoute.totalDurationSeconds / 60) 
+    : 12;
+  const distanceKm = selectedRoute 
+    ? (selectedRoute.totalDistanceMeters / 1000).toFixed(1) 
+    : '4,8';
+  
+  const arrivalDate = new Date(Date.now() + totalMinutes * 60 * 1000);
+  const etaTime = arrivalDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'engarrafamento':
-        return '🚗';
-      case 'alagamento':
-        return '🌊';
-      case 'buraco':
-        return '🕳️';
-      case 'objeto_via':
-        return '📦';
-      case 'veiculo_parado':
-        return '🛑';
-      case 'acidente':
-        return '💥';
-      case 'blitz':
-        return '👮‍♂️';
-      case 'via_parcialmente_interditada':
-        return '⚠️';
-      case 'via_interditada':
-        return '⛔';
-      case 'acesso_fechado':
-        return '🚫';
-      case 'ponto_roubo':
-        return '🚨';
-      case 'local_perigoso':
-        return '⚡';
-      case 'obras':
-        return '🚧';
-      case 'oleo_pista':
-        return '🛢️';
-      default:
-        return '⚠️';
+  // Quick report handler
+  const handleQuickReportClick = (category: string, label: string) => {
+    if (onQuickReport) {
+      onQuickReport(category, `Alerta de ${label} reportado pelo condutor`);
+    } else if (onOpenQuickSignals) {
+      onOpenQuickSignals();
     }
+
+    setReportSuccessToast(`✓ ${label} registrado no mapa!`);
+    setTimeout(() => setReportSuccessToast(null), 2500);
   };
 
-  const getSeverityBadge = (severity: string) => {
-    switch (severity) {
-      case 'critica':
-        return <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-red-600 text-white animate-pulse">Crítico</span>;
-      case 'alta':
-        return <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-orange-500 text-slate-950">Alto Risco</span>;
-      case 'media':
-        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/30 text-amber-300 border border-amber-600/40">Moderado</span>;
-      default:
-        return <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-slate-800 text-slate-300">Atenção</span>;
-    }
-  };
-
-  const handleConfirm = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirmedIds.includes(id)) {
-      setConfirmedIds(prev => [...prev, id]);
-      if (onConfirmOccurrence) onConfirmOccurrence(id);
-    }
-  };
-
-  const totalActive = occurrences.filter(o => !o.isNormalized).length;
+  // The 12 Signal Categories defined in Section 9
+  const valberSignals = [
+    { category: 'engarrafamento', label: 'Engarrafamento', icon: <Car className="w-3.5 h-3.5" />, color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+    { category: 'alagamento', label: 'Alagamento', icon: <Droplets className="w-3.5 h-3.5" />, color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
+    { category: 'buraco', label: 'Buraco na Via', icon: <AlertTriangle className="w-3.5 h-3.5" />, color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+    { category: 'objeto_via', label: 'Objeto na Pista', icon: <Package className="w-3.5 h-3.5" />, color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+    { category: 'veiculo_parado', label: 'Veículo Parado', icon: <AlertOctagon className="w-3.5 h-3.5" />, color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+    { category: 'acidente', label: 'Acidente', icon: <Flame className="w-3.5 h-3.5" />, color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    { category: 'blitz', label: 'Blitz Policial', icon: <Siren className="w-3.5 h-3.5" />, color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+    { category: 'via_parcialmente_interditada', label: 'Via Parcial Fechada', icon: <AlertCircle className="w-3.5 h-3.5" />, color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+    { category: 'via_interditada', label: 'Via Interditada', icon: <AlertCircle className="w-3.5 h-3.5" />, color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    { category: 'acesso_fechado', label: 'Acesso Fechado', icon: <RouteIcon className="w-3.5 h-3.5" />, color: 'bg-rose-500/20 text-rose-400 border-rose-500/30' },
+    { category: 'ponto_roubo', label: 'Ponto de Roubos', icon: <ShieldAlert className="w-3.5 h-3.5" />, color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+    { category: 'local_perigoso', label: 'Local Perigoso', icon: <Sparkles className="w-3.5 h-3.5" />, color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+  ];
 
   return (
-    <div className="absolute bottom-2 left-2 right-2 sm:left-4 sm:right-auto sm:w-[420px] z-30 select-none pb-[env(safe-area-inset-bottom)]">
-      <div className="bg-slate-950/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 flex flex-col">
-        {/* Quick Essential Discovery Carousel (Posto GNV, Borracheiro, Polícia, Hospital, Reboque) */}
-        <div className="bg-slate-900/90 border-b border-slate-800/80 px-2 py-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          {/* Posto GNV */}
-          <button
-            onClick={() => onFindNearest && onFindNearest('posto_gnv')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/60 text-[11px] font-bold text-cyan-300 whitespace-nowrap active:scale-95 transition-all shadow-sm"
-            title="Encontrar Posto de Gasolina & GNV mais próximo"
-          >
-            <Fuel className="w-3.5 h-3.5 text-lime-400" />
-            <span>Posto & GNV</span>
-          </button>
-
-          {/* Borracheiro */}
-          <button
-            onClick={() => onFindNearest && onFindNearest('borracheiro')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/60 text-[11px] font-bold text-amber-300 whitespace-nowrap active:scale-95 transition-all shadow-sm"
-            title="Encontrar Borracheiro 24h aberto mais próximo"
-          >
-            <Disc className="w-3.5 h-3.5 text-amber-400" />
-            <span>Borracheiro 24h</span>
-          </button>
-
-          {/* Polícia / DPO */}
-          <button
-            onClick={() => onFindNearest && onFindNearest('policia')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/60 text-[11px] font-bold text-indigo-300 whitespace-nowrap active:scale-95 transition-all shadow-sm"
-            title="Encontrar Delegacia / DPO / Polícia mais próxima"
-          >
-            <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
-            <span>Polícia / DPO</span>
-          </button>
-
-          {/* Hospital */}
-          <button
-            onClick={() => onFindNearest && onFindNearest('saude')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/60 text-[11px] font-bold text-red-300 whitespace-nowrap active:scale-95 transition-all shadow-sm"
-            title="Encontrar Hospital / UPA mais próximo"
-          >
-            <HeartPulse className="w-3.5 h-3.5 text-red-400" />
-            <span>Hospital / UPA</span>
-          </button>
-
-          {/* Reboque & Bateria */}
-          <button
-            onClick={() => onOpenSocorroModal && onOpenSocorroModal()}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-[11px] font-black whitespace-nowrap active:scale-95 transition-all shadow-md shadow-emerald-500/20"
-            title="Pedir Reboque / Bateria 24h (Sem Seguro)"
-          >
-            <Truck className="w-3.5 h-3.5" />
-            <span>Reboque / SOS</span>
-          </button>
-        </div>
-
-        {/* Header Bar */}
-        <div 
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center justify-between p-2.5 sm:p-3 cursor-pointer hover:bg-slate-900/60 transition-colors"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 shrink-0">
-              <AlertTriangle className="w-4 h-4 animate-pulse" />
-              {totalActive > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white">
-                  {totalActive}
-                </span>
-              )}
-            </div>
-
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-xs text-white uppercase tracking-wider">Acontecendo na Via</span>
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-500"></span>
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 line-clamp-1">
-                {totalActive > 0 ? `${totalActive} alertas ativos (trânsito, buracos, blitz...)` : 'Via limpa no seu raio de GPS'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {/* 1-Tap Quick Report Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onOpenQuickSignals) onOpenQuickSignals();
-                else if (onOpenReportModal) onOpenReportModal();
-              }}
-              className="flex items-center gap-1 bg-gradient-to-r from-lime-400 to-emerald-400 hover:brightness-110 text-slate-950 px-2.5 py-1.5 rounded-xl text-xs font-black shadow-md shadow-lime-500/20 active:scale-95 transition-all"
-              title="Sinalizar perigo na via em 1 toque"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[3]" />
-              <span>Sinalizar</span>
-            </button>
-
-            <button 
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title={isExpanded ? 'Recolher Card' : 'Expandir Alertas'}
-            >
-              {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Collapsible Content */}
-        {isExpanded && (
-          <div className="border-t border-slate-800/80 p-3 flex flex-col gap-2.5 max-h-[380px] overflow-y-auto">
-            {/* Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px] no-scrollbar">
-              <button
-                onClick={() => setSelectedFilter('all')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
-                  selectedFilter === 'all'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Todos ({totalActive})
-              </button>
-
-              <button
-                onClick={() => setSelectedFilter('radars')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
-                  selectedFilter === 'radars'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                👮‍♂️ Blitz & Fiscalização
-              </button>
-
-              <button
-                onClick={() => setSelectedFilter('hazards')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
-                  selectedFilter === 'hazards'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                🕳️ Buracos & Alagamento
-              </button>
-
-              <button
-                onClick={() => setSelectedFilter('traffic')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
-                  selectedFilter === 'traffic'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                🚗 Trânsito & Interdições
-              </button>
-
-              <button
-                onClick={() => setSelectedFilter('security')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
-                  selectedFilter === 'security'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                🚨 Ponto de Roubos & Perigo
-              </button>
-            </div>
-
-            {/* List of Occurrences */}
-            <div className="flex flex-col gap-2">
-              {filtered.length === 0 ? (
-                <div className="text-center py-6 text-slate-500 text-xs">
-                  Nenhum alerta nesta categoria no momento. Boa viagem!
-                </div>
-              ) : (
-                filtered.map(occ => {
-                  const isConfirmed = confirmedIds.includes(occ.id);
-                  const count = occ.confirmationsCount + (isConfirmed ? 1 : 0);
-
-                  return (
-                    <div
-                      key={occ.id}
-                      onClick={() => onSelectOccurrence(occ)}
-                      className="bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-2.5 flex flex-col gap-1.5 cursor-pointer transition-all active:scale-[0.99]"
-                    >
-                      {/* Top Info */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg leading-none">{getCategoryIcon(occ.category)}</span>
-                          <div>
-                            <h4 className="font-bold text-xs text-slate-100 leading-snug">{occ.title}</h4>
-                            <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                              <MapPin className="w-3 h-3 text-cyan-400" />
-                              <span className="truncate max-w-[180px]">{occ.locationName || 'Na via'}</span>
-                            </p>
-                          </div>
-                        </div>
-
-                        {getSeverityBadge(occ.severity)}
-                      </div>
-
-                      {/* Description */}
-                      {occ.description && (
-                        <p className="text-[11px] text-slate-300 bg-slate-950/60 p-1.5 rounded-lg border border-slate-800/60 leading-relaxed">
-                          {occ.description}
-                        </p>
-                      )}
-
-                      {/* Actions Footer */}
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <span>Faixa: <b className="text-slate-300">{occ.affectedLanes || 'Via Geral'}</b></span>
-                        </span>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => handleConfirm(occ.id, e)}
-                            className={`flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold transition-all ${
-                              isConfirmed
-                                ? 'bg-emerald-950 border border-emerald-600/60 text-emerald-300'
-                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                            }`}
-                            title="Confirmar que o alerta continua ativo"
-                          >
-                            <ThumbsUp className="w-3 h-3" />
-                            <span>{count} {isConfirmed ? 'Confirmado' : 'Confirmar'}</span>
-                          </button>
-
-                          <span className="text-lime-400 font-bold hover:underline">
-                            Ver no Mapa ➔
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[calc(100%-1rem)] sm:w-[500px] max-w-lg z-30 select-none pointer-events-auto pb-[env(safe-area-inset-bottom)]">
+      <div className="bg-slate-950/90 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 flex flex-col shadow-black/80">
+        
+        {/* Toast Feedback */}
+        {reportSuccessToast && (
+          <div className="mx-3 mt-2 p-2 rounded-xl bg-cyan-400 text-slate-950 font-bold text-xs text-center animate-fade-in shadow-md">
+            {reportSuccessToast}
           </div>
         )}
+
+        {/* COMPACT & SLEEK MAIN BAR */}
+        <div className="px-4 py-2.5 flex items-center justify-between gap-3">
+          {/* Left: ETA & Live Status */}
+          <div 
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex flex-col text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-white font-extrabold text-xl sm:text-2xl tracking-tight group-hover:text-cyan-400 transition-colors">
+                {totalMinutes} min
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400">
+                • {distanceKm} km
+              </span>
+            </div>
+            <div className="text-[11px] font-medium text-slate-400 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Chegada às {etaTime}</span>
+            </div>
+          </div>
+
+          {/* Right: Actions (Rotas & Navegar) */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onOpenRoutePlanner}
+              className="px-3 py-2 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-200 text-xs font-semibold active:scale-95 transition-all shadow-sm flex items-center gap-1.5"
+              title="Buscar ou Traçar Rota"
+            >
+              <RouteIcon className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Rotas</span>
+            </button>
+
+            <button
+              onClick={onStartNavigation}
+              className="px-4 py-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-white text-xs font-bold active:scale-95 transition-all shadow-lg shadow-cyan-500/25 flex items-center gap-1.5"
+              title="Iniciar Navegação com GPS"
+            >
+              <Navigation className="w-3.5 h-3.5 fill-white" />
+              <span>Navegar</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 5 CLEAN 1-TAP ESSENTIAL SHORTCUTS */}
+        <div className="px-3 py-2 grid grid-cols-5 gap-1.5 border-t border-slate-800/60 bg-slate-900/30">
+          {/* 1. Posto/GNV */}
+          <button
+            onClick={() => onFindNearest?.('posto_gnv')}
+            className="py-1.5 px-1 rounded-2xl hover:bg-slate-850 active:scale-95 transition-all flex flex-col items-center justify-center text-center group"
+            title="Posto de Gasolina e GNV"
+          >
+            <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-400 mb-1 group-hover:scale-105 transition-transform">
+              <Fuel className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-medium text-slate-300 truncate max-w-full">Postos</span>
+          </button>
+
+          {/* 2. Borracheiro */}
+          <button
+            onClick={() => onFindNearest?.('borracheiro')}
+            className="py-1.5 px-1 rounded-2xl hover:bg-slate-850 active:scale-95 transition-all flex flex-col items-center justify-center text-center group"
+            title="Borracheiro 24h"
+          >
+            <div className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/25 flex items-center justify-center text-orange-400 mb-1 group-hover:scale-105 transition-transform">
+              <Disc className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-medium text-slate-300 truncate max-w-full">Borracheiro</span>
+          </button>
+
+          {/* 3. Polícia */}
+          <button
+            onClick={() => onFindNearest?.('policia')}
+            className="py-1.5 px-1 rounded-2xl hover:bg-slate-850 active:scale-95 transition-all flex flex-col items-center justify-center text-center group"
+            title="Polícia e DPO"
+          >
+            <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 mb-1 group-hover:scale-105 transition-transform">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-medium text-slate-300 truncate max-w-full">Polícia</span>
+          </button>
+
+          {/* 4. Saúde */}
+          <button
+            onClick={() => onFindNearest?.('saude')}
+            className="py-1.5 px-1 rounded-2xl hover:bg-slate-850 active:scale-95 transition-all flex flex-col items-center justify-center text-center group"
+            title="UPA e Hospital"
+          >
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400 mb-1 group-hover:scale-105 transition-transform">
+              <HeartPulse className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-medium text-slate-300 truncate max-w-full">Saúde</span>
+          </button>
+
+          {/* 5. SINALIZAR */}
+          <button
+            onClick={onOpenQuickSignals}
+            className="py-1.5 px-1 rounded-2xl hover:bg-red-950/30 active:scale-95 transition-all flex flex-col items-center justify-center text-center group"
+            title="Sinalizar Ocorrência na Via"
+          >
+            <div className="w-8 h-8 rounded-xl bg-red-600/90 border border-red-500/40 flex items-center justify-center text-white mb-1 group-hover:scale-105 transition-transform shadow-md shadow-red-600/30 animate-pulse">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-bold text-red-400 truncate max-w-full">Sinalizar</span>
+          </button>
+        </div>
+
+        {/* EXPAND TOGGLE FOOTER */}
+        <div 
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full py-1 px-4 bg-slate-950/60 border-t border-slate-800/60 flex items-center justify-between cursor-pointer hover:bg-slate-900/60 transition-colors text-[10px] text-slate-400"
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="text-cyan-400">⚡</span>
+            <span>{isExpanded ? 'Recolher Atalhos' : 'O que tem aqui, Clima, Transporte e Alertas'}</span>
+          </div>
+          <span className="flex items-center gap-0.5 text-cyan-400 font-semibold">
+            {isExpanded ? (
+              <><span>Fechar</span><ChevronDown className="w-3.5 h-3.5" /></>
+            ) : (
+              <><span>Mais</span><ChevronUp className="w-3.5 h-3.5" /></>
+            )}
+          </span>
+        </div>
+
+        {/* EXPANDABLE SECONDARY DRAWER */}
+        {isExpanded && (
+          <div className="flex flex-col p-3 gap-3 max-h-[46vh] overflow-y-auto border-t border-slate-800/80 bg-slate-950/95 animate-in fade-in duration-200 scrollbar-thin">
+            
+            {/* Quick Discover Shortcuts */}
+            <div className="grid grid-cols-5 gap-1.5 text-center">
+              <button
+                onClick={onOpenOQueTemAqui}
+                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-cyan-300"
+              >
+                <Radar className="w-4 h-4 text-cyan-400 mb-0.5 animate-spin-slow" />
+                <span className="text-[9px] font-medium">O Que Tem</span>
+              </button>
+
+              <button
+                onClick={onOpenWeatherModal}
+                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-amber-300"
+              >
+                <CloudSun className="w-4 h-4 text-amber-400 mb-0.5" />
+                <span className="text-[9px] font-medium">Clima</span>
+              </button>
+
+              <button
+                onClick={() => onFindNearest?.('transporte_infraestrutura')}
+                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-sky-300"
+              >
+                <Bus className="w-4 h-4 text-sky-400 mb-0.5" />
+                <span className="text-[9px] font-medium">Transporte</span>
+              </button>
+
+              <button
+                onClick={() => onFindNearest?.('mercado')}
+                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-purple-300"
+              >
+                <ShoppingCart className="w-4 h-4 text-purple-400 mb-0.5" />
+                <span className="text-[9px] font-medium">Mercado</span>
+              </button>
+
+              <button
+                onClick={onOpenConhecaEsteLugar}
+                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-yellow-300"
+              >
+                <Sparkles className="w-4 h-4 text-yellow-400 mb-0.5" />
+                <span className="text-[9px] font-medium">História</span>
+              </button>
+            </div>
+
+            {/* 12 Quick Signal Chips */}
+            <div>
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                <span>Sinalizar Ocorrência Rápida</span>
+                <button
+                  onClick={onOpenQuickSignals}
+                  className="text-cyan-400 hover:underline text-[10px] font-bold"
+                >
+                  Grade Completa ➔
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {valberSignals.map((sig) => (
+                  <button
+                    key={sig.category}
+                    onClick={() => handleQuickReportClick(sig.category, sig.label)}
+                    className={`p-2 rounded-xl border flex items-center gap-2 text-left active:scale-95 transition-all text-[10.5px] font-medium ${sig.color}`}
+                  >
+                    <span>{sig.icon}</span>
+                    <span className="truncate">{sig.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
+              <span>TÔ PASSANDO • GPS INTELIGENTE 4.0</span>
+              <button
+                onClick={onOpenAboutApp}
+                className="text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1"
+              >
+                <Info className="w-3 h-3" />
+                <span>Sobre o App</span>
+              </button>
+            </div>
+
+          </div>
+        )}
+
       </div>
     </div>
   );
 };
-
