@@ -145,16 +145,22 @@ export interface RouteOption {
   }[];
 }
 
-// 12+ Explicit Highway Warning Types (including Waze Speed Cameras & Roadworks)
+// 20+ Explicit Highway & Urban Security Warning Types
 export type OccurrenceCategory = 
   | 'engarrafamento'
+  | 'lentidao'
   | 'congestionamento'
   | 'alagamento'
   | 'buraco'
+  | 'trecho_buracos'
+  | 'falta_pavimentacao'
+  | 'sem_sinalizacao'
+  | 'falta_iluminacao'
   | 'objeto_via'
   | 'veiculo_parado'
   | 'acidente'
   | 'blitz'
+  | 'policiamento_ativo'
   | 'radar'
   | 'via_parcialmente_interditada'
   | 'via_interditada'
@@ -162,6 +168,9 @@ export type OccurrenceCategory =
   | 'animal_pista'
   | 'incendio'
   | 'ponto_roubo'
+  | 'roubo_celular_semaforo'
+  | 'roubo_carro_moto'
+  | 'roubo_pedestre'
   | 'local_perigoso'
   | 'obras'
   | 'obra'
@@ -222,6 +231,9 @@ export interface Occurrence {
   photoUrl?: string;
   isAiValidated?: boolean;
   aiConfidencePercent?: number;
+  speedLimitKmh?: number;
+  riskRadiusMeters?: number;
+  zoneColor?: string;
 }
 
 export type PlaceCategory = 

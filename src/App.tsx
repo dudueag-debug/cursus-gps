@@ -130,6 +130,7 @@ export function App() {
   const [isAboutAppOpen, setIsAboutAppOpen] = useState(false);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [isPhotoIncidentModalOpen, setIsPhotoIncidentModalOpen] = useState(false);
+  const [photoIncidentCoords, setPhotoIncidentCoords] = useState<Coordinates | null>(null);
   const [isFutureTechModalOpen, setIsFutureTechModalOpen] = useState(false);
   const [isLayersModalOpen, setIsLayersModalOpen] = useState(false);
   const [isOfflineRegionsModalOpen, setIsOfflineRegionsModalOpen] = useState(false);
@@ -649,11 +650,15 @@ export function App() {
     photoUrl?: string;
     isAiValidated?: boolean;
     aiConfidencePercent?: number;
+    speedLimitKmh?: number;
+    riskRadiusMeters?: number;
+    zoneColor?: string;
   }) => {
     const newOcc = await api.reportOccurrence(data);
     supabaseService.broadcastIncident(newOcc);
+    setCurrentLocation(data.coordinates);
     refreshOccurrences();
-    speakText('Ocorrência validada pela IA e publicada no mapa!');
+    speakText('Local marcado no mapa com alerta e foto em tempo real!');
   };
 
   // Traçar rota a partir de um local encontrado
@@ -764,6 +769,10 @@ export function App() {
         }}
         onOpenTrafficOccurrences={() => setActivePanel('occurrences')}
         onOpenRadars={() => setActivePanel('occurrences')}
+        onOpenPhotoIncident={() => {
+          setPhotoIncidentCoords(currentLocation);
+          setIsPhotoIncidentModalOpen(true);
+        }}
         weatherData={weatherData}
         activeOccurrencesCount={occurrences.filter(o => !o.isNormalized).length}
         detectedLocation={detectedLocationName}
@@ -799,6 +808,11 @@ export function App() {
               if (coords) setCurrentLocation(coords);
               setActivePanel('map');
             }}
+            onOpenPhotoIncident={(coords) => {
+              setPhotoIncidentCoords(coords || currentLocation);
+              setIsPhotoIncidentModalOpen(true);
+            }}
+            onOpenQuickSignals={() => setIsQuickSignalsOpen(true)}
             onUpdateLocation={(coords) => {
               locationService.reverseGeocode(coords).then(rev => {
                 handleLocationSelected(coords, `${rev.city} - ${rev.state} • GPS Ao Vivo`);
@@ -1093,8 +1107,11 @@ export function App() {
       {/* IA de Ocorrências com Foto */}
       <PhotoIncidentModal
         isOpen={isPhotoIncidentModalOpen}
-        onClose={() => setIsPhotoIncidentModalOpen(false)}
-        currentLocation={currentLocation}
+        onClose={() => {
+          setIsPhotoIncidentModalOpen(false);
+          setPhotoIncidentCoords(null);
+        }}
+        currentLocation={photoIncidentCoords || currentLocation}
         detectedLocationName={detectedLocationName}
         onSaveOccurrence={handleSavePhotoOccurrence}
       />

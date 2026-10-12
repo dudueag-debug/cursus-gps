@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import type { Coordinates, RouteOption, Occurrence, CultureSpot, UserProfile, MapLayerType, Place } from '../../types';
 import { createVehicleDivIcon } from './VehicleMarkerIcon';
-import { Crosshair, ZoomIn, ZoomOut, Eye, Layers, Compass, Box, Map as MapIcon, Globe, Navigation, ExternalLink, MapPin, Phone, Star, X } from 'lucide-react';
+import { Crosshair, ZoomIn, ZoomOut, Eye, Layers, Compass, Box, Map as MapIcon, Globe, Navigation, MapPin, Phone, Star, X, Camera, AlertTriangle, Clock, ShieldAlert } from 'lucide-react';
 
 interface GPSMapProps {
   currentLocation: Coordinates;
@@ -21,6 +21,8 @@ interface GPSMapProps {
   onOpenWeather?: () => void;
   onOpenSocorro?: () => void;
   onOpenOccurrences?: () => void;
+  onOpenPhotoIncident?: (coords?: Coordinates) => void;
+  onOpenQuickSignals?: () => void;
   onFindCategory?: (category: any) => void;
   onOpenPlacesPanel?: () => void;
   onOpenWazeLive?: (coords?: Coordinates, label?: string) => void;
@@ -42,6 +44,18 @@ const MAP_QUICK_CATEGORIES = [
   { key: 'policia', label: 'Polícia & Batalhões', emoji: '🚓' },
 ];
 
+function calcDistanceMeters(a: Coordinates, b: Coordinates): number {
+  const R = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLng = Math.sin(dLng / 2);
+  const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+  return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
 export const GPSMap: React.FC<GPSMapProps> = ({
   currentLocation,
   heading,
@@ -56,8 +70,9 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   onSelectPlace,
   onMapClick,
   onOpenOccurrences,
+  onOpenPhotoIncident,
+  onOpenQuickSignals,
   onOpenPlacesPanel,
-  onOpenWazeLive,
   isSplashActive = false,
   activePanel = 'map',
 }) => {
@@ -72,12 +87,29 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   const cultureLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const placesLayerGroupRef = useRef<L.LayerGroup | null>(null);
 
-  // Active layer & 3D perspective mode
-  const [activeLayer, setActiveLayer] = useState<MapLayerType>(user.mapLayerType || 'streets');
+  // Automatic Night Mode detection when dusk arrives (18:00 to 05:59)
+  const isNightHourNow = () => {
+    const h = new Date().getHours();
+    return h >= 18 || h < 6;
+  };
+
+  // Active layer & 3D perspective mode (Automatically starts in 'dark' Noturno mode when evening/night)
+  const [activeLayer, setActiveLayer] = useState<MapLayerType>(() => {
+    if (isNightHourNow()) return 'dark';
+    return user.mapLayerType || 'streets';
+  });
+  const [userManuallyChangedLayer, setUserManuallyChangedLayer] = useState<boolean>(false);
   const [is3DMode, setIs3DMode] = useState<boolean>(user.is3DMode || false);
   const [showLayerMenu, setShowLayerMenu] = useState<boolean>(false);
   const [activeMapCategory, setActiveMapCategory] = useState<string>('all');
   const [selectedMapPlace, setSelectedMapPlace] = useState<Place | null>(null);
+  const [selectedMapOccurrence, setSelectedMapOccurrence] = useState<Occurrence | null>(null);
+  const [tappedMapCoords, setTappedMapCoords] = useState<Coordinates | null>(null);
+
+  // Active Risk Zone Entry Alert & Live Timer until exiting the zone
+  const [activeRiskZone, setActiveRiskZone] = useState<Occurrence | null>(null);
+  const [zoneSecondsElapsed, setZoneSecondsElapsed] = useState<number>(0);
+  const [zoneDismissedId, setZoneDismissedId] = useState<string | null>(null);
 
   // Professional Watermark-Free Layer Definitions for Brazil & Worldwide
   const getLayerConfig = (layer: MapLayerType) => {
@@ -101,7 +133,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
           url: 'https://worldtiles3.waze.com/tiles/{z}/{x}/{y}.png',
           maxZoom: 19,
           className: 'leaflet-tile-futuristic-dark',
-          attribution: '&copy; TÔ PASSANDO Noturno Futurista',
+          attribution: '&copy; TÔ PASSANDO Noturno Automático',
         };
       case 'streets':
       default:
@@ -139,8 +171,9 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   };
 
   // Switch Tile Layer dynamically
-  const switchLayer = (newLayer: MapLayerType) => {
+  const switchLayer = (newLayer: MapLayerType, isManual: boolean = true) => {
     if (!mapRef.current) return;
+    if (isManual) setUserManuallyChangedLayer(true);
     setActiveLayer(newLayer);
 
     if (tileLayerRef.current) {
@@ -150,6 +183,71 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     const newTile = createSafeTile(newLayer).addTo(mapRef.current);
     tileLayerRef.current = newTile;
   };
+
+  // Automatically switch to Night Mode ('dark') when dusk arrives (18:00 - 05:59)
+  useEffect(() => {
+    const checkAutoNight = () => {
+      if (!userManuallyChangedLayer && isNightHourNow() && activeLayer !== 'dark') {
+        switchLayer('dark', false);
+      }
+    };
+    checkAutoNight();
+    const interval = setInterval(checkAutoNight, 30000);
+    return () => clearInterval(interval);
+  }, [activeLayer, userManuallyChangedLayer]);
+
+  // Monitor Real-Time GPS Entry into Dangerous / Risk Zones and Start Live Traversal Timer
+  useEffect(() => {
+    const riskCategories = new Set([
+      'roubo_celular_semaforo',
+      'roubo_carro_moto',
+      'roubo_pedestre',
+      'ponto_roubo',
+      'local_perigoso',
+      'falta_iluminacao',
+      'sem_sinalizacao',
+      'falta_pavimentacao',
+      'trecho_buracos',
+      'alagamento',
+    ]);
+
+    const activeZones = occurrences.filter(
+      o => !o.isNormalized && o.status !== 'resolvida' && riskCategories.has(o.category)
+    );
+
+    let closestZone: Occurrence | null = null;
+    let minDistance = Infinity;
+
+    for (const z of activeZones) {
+      const dist = calcDistanceMeters(currentLocation, z.coordinates);
+      const triggerRadius = (z.riskRadiusMeters || 280) + 120;
+      if (dist <= triggerRadius && dist < minDistance) {
+        minDistance = dist;
+        closestZone = z;
+      }
+    }
+
+    if (closestZone && closestZone.id !== zoneDismissedId) {
+      setActiveRiskZone(prev => {
+        if (prev?.id !== closestZone!.id) {
+          setZoneSecondsElapsed(0);
+        }
+        return closestZone;
+      });
+    } else if (!closestZone) {
+      setActiveRiskZone(null);
+      setZoneSecondsElapsed(0);
+    }
+  }, [currentLocation.lat, currentLocation.lng, occurrences, zoneDismissedId]);
+
+  // Tick the live timer every second while the user is inside the active risk zone
+  useEffect(() => {
+    if (!activeRiskZone) return;
+    const timer = setInterval(() => {
+      setZoneSecondsElapsed(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [activeRiskZone?.id]);
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -196,10 +294,12 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       }).addTo(map);
       vehicleMarkerRef.current = vMarker;
 
-      // Map click handler
+      // Map click handler (allows marking exact spot on map + taking photo)
       map.on('click', (e: L.LeafletMouseEvent) => {
+        const clicked = { lat: e.latlng.lat, lng: e.latlng.lng };
+        setTappedMapCoords(clicked);
         if (onMapClick) {
-          onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
+          onMapClick(clicked);
         }
       });
 
@@ -370,44 +470,73 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     } catch {}
   }, [selectedRoute]);
 
-  // Render Waze-Style Occurrences on Map (Polícia, Radar, Trânsito, Acidente, Obras, Buraco, Alagamento)
+  // Render Real-Time Occurrences & Colored Risk Zones on Map
   useEffect(() => {
     if (!mapRef.current || !occurrencesLayerGroupRef.current) return;
     const group = occurrencesLayerGroupRef.current;
     group.clearLayers();
 
+    const isNightMode = activeLayer === 'dark';
+
     occurrences.forEach(occ => {
       const isResolved = occ.isNormalized || occ.status === 'resolvida';
-      let badgeBg = '#F97316';
+      let badgeBg = occ.zoneColor || '#F97316';
       let badgeEmoji = '⚠️';
       let shortLabel = 'Alerta';
+      let isNightPriority = false;
 
       if (occ.category === 'blitz') {
         badgeBg = '#0284c7';
         badgeEmoji = '👮';
-        shortLabel = 'Polícia';
+        shortLabel = 'Blitz Policial';
+      } else if (occ.category === 'policiamento_ativo') {
+        badgeBg = '#2563eb';
+        badgeEmoji = '🚓';
+        shortLabel = 'Policiamento';
       } else if (occ.category === 'radar') {
         badgeBg = '#dc2626';
         badgeEmoji = '📸';
-        shortLabel = 'Radar 60';
-      } else if (occ.category === 'engarrafamento') {
+        shortLabel = `Pardal ${occ.speedLimitKmh || 60} km/h`;
+      } else if (occ.category === 'roubo_celular_semaforo') {
+        badgeBg = '#e11d48';
+        badgeEmoji = '📱';
+        shortLabel = 'Roubo Celular';
+      } else if (occ.category === 'roubo_carro_moto' || occ.category === 'roubo_pedestre' || occ.category === 'ponto_roubo') {
+        badgeBg = '#dc2626';
+        badgeEmoji = '🚨';
+        shortLabel = 'Alto Assalto';
+      } else if (occ.category === 'local_perigoso') {
+        badgeBg = '#9333ea';
+        badgeEmoji = '⚠️';
+        shortLabel = 'Área Perigosa';
+      } else if (occ.category === 'falta_iluminacao') {
+        badgeBg = '#f59e0b';
+        badgeEmoji = '💡';
+        shortLabel = 'Sem Iluminação';
+        isNightPriority = true;
+      } else if (occ.category === 'sem_sinalizacao') {
+        badgeBg = '#eab308';
+        badgeEmoji = '🚫';
+        shortLabel = 'Sem Sinalização';
+        isNightPriority = true;
+      } else if (occ.category === 'falta_pavimentacao' || occ.category === 'buraco' || occ.category === 'trecho_buracos') {
+        badgeBg = '#ca8a04';
+        badgeEmoji = '🕳️';
+        shortLabel = occ.category === 'falta_pavimentacao' ? 'Sem Asfalto / Buracos' : 'Buraco na Via';
+      } else if (occ.category === 'engarrafamento' || occ.category === 'lentidao' || occ.category === 'congestionamento') {
         badgeBg = '#ea580c';
         badgeEmoji = '🚗';
-        shortLabel = 'Trânsito';
+        shortLabel = 'Engarrafamento';
       } else if (occ.category === 'acidente') {
         badgeBg = '#e11d48';
         badgeEmoji = '💥';
         shortLabel = 'Acidente';
-      } else if (occ.category === 'obra') {
+      } else if (occ.category === 'obra' || occ.category === 'obras') {
         badgeBg = '#d97706';
         badgeEmoji = '🚧';
         shortLabel = 'Obras';
-      } else if (occ.category === 'buraco') {
-        badgeBg = '#ca8a04';
-        badgeEmoji = '🕳️';
-        shortLabel = 'Buraco';
       } else if (occ.category === 'alagamento') {
-        badgeBg = '#2563eb';
+        badgeBg = '#0284c7';
         badgeEmoji = '🌊';
         shortLabel = 'Alagamento';
       }
@@ -416,12 +545,44 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         badgeBg = '#10B981';
       }
 
+      // Draw Colored Risk Zone Perimeter Circle on Map ("esse local fica com outra cor ou marcado")
+      if (!isResolved && (occ.riskRadiusMeters || isNightPriority)) {
+        const radius = occ.riskRadiusMeters || 220;
+        const circleColor = occ.zoneColor || badgeBg;
+        const highlightAtNight = isNightMode && isNightPriority;
+
+        const zoneCircle = L.circle([occ.coordinates.lat, occ.coordinates.lng], {
+          radius,
+          color: highlightAtNight ? '#fde047' : circleColor,
+          weight: highlightAtNight ? 3.5 : 2.5,
+          opacity: 0.95,
+          fillColor: circleColor,
+          fillOpacity: highlightAtNight ? 0.38 : 0.22,
+          dashArray: occ.category === 'roubo_celular_semaforo' || occ.category === 'local_perigoso' ? undefined : '6, 6',
+        });
+
+        zoneCircle.on('click', () => {
+          setSelectedMapPlace(null);
+          setSelectedMapOccurrence(occ);
+          setActiveRiskZone(occ);
+          setZoneSecondsElapsed(0);
+          onSelectOccurrence(occ);
+        });
+
+        group.addLayer(zoneCircle);
+      }
+
+      const nightGlowClass =
+        isNightMode && isNightPriority
+          ? 'ring-4 ring-yellow-300 shadow-[0_0_22px_#fde047] scale-110'
+          : '';
+
       const iconHtml = `
         <div class="relative flex flex-col items-center justify-center cursor-pointer group">
-          <div class="w-9 h-9 rounded-full flex items-center justify-center shadow-xl border-2 border-white transition-transform hover:scale-125" style="background-color: ${badgeBg}">
+          <div class="w-9 h-9 rounded-full flex items-center justify-center shadow-xl border-2 border-white transition-transform hover:scale-125 ${nightGlowClass}" style="background-color: ${badgeBg}">
             <span class="text-base leading-none">${badgeEmoji}</span>
           </div>
-          <span class="mt-0.5 px-1.5 py-0.2 rounded-full bg-slate-950/90 text-white font-black text-[9px] shadow border border-white/20 whitespace-nowrap">
+          <span class="mt-0.5 px-1.5 py-0.2 rounded-full bg-slate-950/95 text-white font-black text-[9px] shadow border border-white/30 whitespace-nowrap">
             ${shortLabel}
           </span>
           ${!isResolved ? '<span class="absolute -top-0.5 right-0 w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-ping"></span>' : ''}
@@ -431,15 +592,23 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       const occIcon = L.divIcon({
         className: 'tp-occ-marker',
         html: iconHtml,
-        iconSize: [44, 44],
-        iconAnchor: [22, 22],
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
       });
 
-      const marker = L.marker([occ.coordinates.lat, occ.coordinates.lng], { icon: occIcon, zIndexOffset: 700 });
-      marker.on('click', () => onSelectOccurrence(occ));
+      const marker = L.marker([occ.coordinates.lat, occ.coordinates.lng], { icon: occIcon, zIndexOffset: 750 });
+      marker.on('click', () => {
+        setSelectedMapPlace(null);
+        setSelectedMapOccurrence(occ);
+        if (occ.riskRadiusMeters) {
+          setActiveRiskZone(occ);
+          setZoneSecondsElapsed(0);
+        }
+        onSelectOccurrence(occ);
+      });
 
       marker.bindTooltip(`
-        <div class="text-xs p-1.5 font-semibold max-w-[220px]">
+        <div class="text-xs p-1.5 font-semibold max-w-[230px]">
           <div class="font-black text-slate-900">${badgeEmoji} ${occ.title}</div>
           <div class="text-[10px] text-slate-700 mt-0.5">${occ.description || ''}</div>
           <div class="text-[10px] text-cyan-800 font-bold mt-1">${isResolved ? '✅ Normalizada' : '🔴 Fica Atento Tô Passando'} • 👍 ${occ.confirmationsCount} confirmações</div>
@@ -448,7 +617,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
       group.addLayer(marker);
     });
-  }, [occurrences, onSelectOccurrence]);
+  }, [occurrences, onSelectOccurrence, activeLayer]);
 
   // Render Culture & Heritage Spots
   useEffect(() => {
@@ -675,7 +844,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         />
       </div>
 
-      {/* Top Floating Bar: Tô Passando Nesse Momento Switch + Neighborhood Commerce & Services Chips */}
+      {/* Top Floating Bar: Tô Passando Nesse Momento + Marcar Foto + Fica Atento + Commerce Chips */}
       {!isNavigating && (
         <div className="absolute top-2.5 left-2.5 right-16 z-30 flex flex-col gap-1.5 pointer-events-none">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto pb-1">
@@ -686,6 +855,25 @@ export const GPSMap: React.FC<GPSMapProps> = ({
               <Compass className="w-3.5 h-3.5 text-slate-950 animate-spin" style={{ animationDuration: '9s' }} />
               <span>Tô Passando Nesse Momento</span>
             </button>
+
+            {onOpenPhotoIncident && (
+              <button
+                onClick={() => onOpenPhotoIncident(tappedMapCoords || currentLocation)}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-rose-600 to-amber-500 hover:brightness-110 text-white font-black text-[11px] shadow-xl border border-rose-300 active:scale-95 transition-all"
+              >
+                <Camera className="w-3.5 h-3.5 text-white" />
+                <span>📸 Marcar Local + Foto</span>
+              </button>
+            )}
+
+            {onOpenQuickSignals && (
+              <button
+                onClick={onOpenQuickSignals}
+                className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-red-600/90 hover:bg-red-500 text-white font-black text-[11px] shadow-xl border border-red-400 active:scale-95 transition-all"
+              >
+                <span>🚨 Sinalizar na Via</span>
+              </button>
+            )}
 
             {onOpenOccurrences && (
               <button
@@ -713,6 +901,186 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 </button>
               );
             })}
+          </div>
+
+          {/* Active Risk Zone Entry Alert & Live Countdown/Elapsed Timer Until Exit */}
+          {activeRiskZone && (
+            <div className="pointer-events-auto max-w-md bg-gradient-to-r from-red-950/95 via-rose-950/95 to-slate-950/95 border-2 border-rose-500 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md animate-in fade-in duration-200">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-rose-600 flex items-center justify-center text-white shrink-0 animate-pulse shadow-lg">
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-1.5 py-0.2 rounded bg-rose-500 text-white font-black text-[9px] uppercase tracking-wider">
+                        ALERTA DE ENTRADA EM LOCAL DE RISCO
+                      </span>
+                      <span className="text-[10px] font-mono font-black text-amber-300 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-amber-400" />
+                        Tempo no local: {String(Math.floor(zoneSecondsElapsed / 60)).padStart(2, '0')}:
+                        {String(zoneSecondsElapsed % 60).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <div className="text-xs font-black text-white truncate mt-0.5">
+                      {activeRiskZone.title}
+                    </div>
+                    <div className="text-[10px] text-rose-200 line-clamp-2 leading-snug">
+                      {activeRiskZone.description}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setZoneDismissedId(activeRiskZone.id);
+                    setActiveRiskZone(null);
+                  }}
+                  className="p-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white shrink-0"
+                  title="Fechar alerta de zona"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {(() => {
+                const distToCenter = calcDistanceMeters(currentLocation, activeRiskZone.coordinates);
+                const radius = activeRiskZone.riskRadiusMeters || 280;
+                const remainingMeters = Math.max(40, Math.round(radius + 60 - Math.min(distToCenter, radius)));
+                const estSecondsToExit = Math.max(15, Math.round(remainingMeters / 8.5) - zoneSecondsElapsed);
+                const minsLeft = Math.floor(estSecondsToExit / 60);
+                const secsLeft = estSecondsToExit % 60;
+                return (
+                  <div className="mt-2 pt-1.5 border-t border-rose-500/30 flex items-center justify-between text-[10px] font-bold">
+                    <span className="text-lime-300">
+                      ⏱️ Tempo estimado até sair deste local: ~{String(minsLeft).padStart(2, '0')}:{String(secsLeft).padStart(2, '0')} ({remainingMeters}m)
+                    </span>
+                    <button
+                      onClick={() => setSelectedMapOccurrence(activeRiskZone)}
+                      className="text-cyan-300 hover:underline font-black"
+                    >
+                      Ver Foto & Detalhes →
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Quick Prompt when User Taps a Point on the Map */}
+          {tappedMapCoords && onOpenPhotoIncident && (
+            <div className="pointer-events-auto max-w-sm bg-slate-950/95 border border-lime-400/70 rounded-xl px-3 py-2 shadow-xl flex items-center justify-between gap-2">
+              <div className="text-[10px] text-slate-200 min-w-0">
+                <span className="font-black text-lime-400 block">📍 Ponto Selecionado no Mapa</span>
+                <span className="font-mono text-slate-400">
+                  {tappedMapCoords.lat.toFixed(5)}, {tappedMapCoords.lng.toFixed(5)}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => onOpenPhotoIncident(tappedMapCoords)}
+                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 text-white font-black text-[10px] flex items-center gap-1 shadow"
+                >
+                  <Camera className="w-3 h-3" />
+                  <span>Marcar + Foto Aqui</span>
+                </button>
+                <button
+                  onClick={() => setTappedMapCoords(null)}
+                  className="p-1 text-slate-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Floating Selected Occurrence / Risk Zone Card (Shows User Photo, Colored Risk Badge, Speed Limit & Timer) */}
+      {selectedMapOccurrence && !isNavigating && (
+        <div className="absolute top-14 left-3 right-16 sm:right-auto sm:w-[390px] z-30 bg-slate-950/95 border-2 border-rose-500/70 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
+          {selectedMapOccurrence.photoUrl && (
+            <div className="relative h-36 w-full bg-slate-900 overflow-hidden">
+              <img
+                src={selectedMapOccurrence.photoUrl}
+                alt={selectedMapOccurrence.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
+              <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-rose-600 text-white font-black text-[10px] shadow-lg">
+                📸 Foto Real do Local Demarcado
+              </span>
+              <button
+                onClick={() => setSelectedMapOccurrence(null)}
+                className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-950/80 hover:bg-slate-900 text-white border border-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <div className="p-3 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <span
+                  className="inline-block px-2 py-0.5 rounded text-[9px] font-black uppercase text-white mb-1"
+                  style={{ backgroundColor: selectedMapOccurrence.zoneColor || '#e11d48' }}
+                >
+                  {selectedMapOccurrence.speedLimitKmh
+                    ? `📸 Limite ${selectedMapOccurrence.speedLimitKmh} km/h`
+                    : selectedMapOccurrence.riskRadiusMeters
+                    ? `Zona Demarcada (${selectedMapOccurrence.riskRadiusMeters}m)`
+                    : 'Alerta em Tempo Real'}
+                </span>
+                <h4 className="text-sm font-black text-white leading-tight">
+                  {selectedMapOccurrence.title}
+                </h4>
+              </div>
+              {!selectedMapOccurrence.photoUrl && (
+                <button
+                  onClick={() => setSelectedMapOccurrence(null)}
+                  className="p-1 rounded-lg bg-slate-900 text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <p className="text-[11px] text-slate-200 leading-snug">
+              {selectedMapOccurrence.description}
+            </p>
+
+            <div className="text-[10px] text-cyan-300 font-bold flex items-center justify-between pt-1 border-t border-slate-800">
+              <span>📍 {selectedMapOccurrence.locationName}</span>
+              <span>👍 {selectedMapOccurrence.confirmationsCount} confirmações</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 pt-1">
+              <button
+                onClick={() => {
+                  setActiveRiskZone(selectedMapOccurrence);
+                  setZoneDismissedId(null);
+                  setZoneSecondsElapsed(0);
+                  setSelectedMapOccurrence(null);
+                }}
+                className="py-2 px-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-[10px] flex items-center justify-center gap-1 shadow"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Abrir Tempo de Saída</span>
+              </button>
+              {onOpenPhotoIncident && (
+                <button
+                  onClick={() => {
+                    const coords = selectedMapOccurrence.coordinates;
+                    setSelectedMapOccurrence(null);
+                    onOpenPhotoIncident(coords);
+                  }}
+                  className="py-2 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] flex items-center justify-center gap-1 shadow"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Atualizar com Foto</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -839,15 +1207,26 @@ export const GPSMap: React.FC<GPSMapProps> = ({
           <Crosshair className="w-5 h-5 group-hover:rotate-45 transition-transform" />
         </button>
 
-        {/* Noturno Futurista Quick Toggle */}
+        {/* Quick Camera Mark Button on Right HUD */}
+        {onOpenPhotoIncident && (
+          <button
+            onClick={() => onOpenPhotoIncident(tappedMapCoords || currentLocation)}
+            className="p-3 bg-rose-600/95 hover:bg-rose-500 text-white rounded-xl shadow-xl border border-rose-400 backdrop-blur-md active:scale-95 transition-all"
+            title="Marcar Local de Roubo ou Problema na Via + Tirar Foto"
+          >
+            <Camera className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Noturno Automático / Manual Quick Toggle */}
         <button
-          onClick={() => switchLayer(activeLayer === 'dark' ? 'streets' : 'dark')}
+          onClick={() => switchLayer(activeLayer === 'dark' ? 'streets' : 'dark', true)}
           className={`p-3 rounded-xl shadow-xl border backdrop-blur-md active:scale-95 transition-all flex items-center justify-center ${
             activeLayer === 'dark'
               ? 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-500/30'
               : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700/80'
           }`}
-          title={activeLayer === 'dark' ? 'Modo Noturno Futurista Ativo (Clique para Diurno)' : 'Ativar Modo Noturno Futurista'}
+          title={activeLayer === 'dark' ? 'Modo Noturno Ativo (Destaque de Iluminação e Sinalização)' : 'Ativar Modo Noturno'}
         >
           <span className="text-base leading-none select-none">🌙</span>
         </button>
@@ -887,7 +1266,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
               </div>
               
               <button
-                onClick={() => { switchLayer('streets'); setShowLayerMenu(false); }}
+                onClick={() => { switchLayer('streets', true); setShowLayerMenu(false); }}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                   activeLayer === 'streets'
                     ? 'bg-blue-600 text-white shadow-md'
@@ -899,7 +1278,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
               </button>
 
               <button
-                onClick={() => { switchLayer('satellite'); setShowLayerMenu(false); }}
+                onClick={() => { switchLayer('satellite', true); setShowLayerMenu(false); }}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                   activeLayer === 'satellite'
                     ? 'bg-blue-600 text-white shadow-md'
@@ -911,7 +1290,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
               </button>
 
               <button
-                onClick={() => { switchLayer('topo'); setShowLayerMenu(false); }}
+                onClick={() => { switchLayer('topo', true); setShowLayerMenu(false); }}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                   activeLayer === 'topo'
                     ? 'bg-blue-600 text-white shadow-md'
@@ -923,7 +1302,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
               </button>
 
               <button
-                onClick={() => { switchLayer('dark'); setShowLayerMenu(false); }}
+                onClick={() => { switchLayer('dark', true); setShowLayerMenu(false); }}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                   activeLayer === 'dark'
                     ? 'bg-blue-600 text-white shadow-md'
@@ -966,16 +1345,16 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         </div>
       </div>
 
-      {/* Floating Info & Mode Pill (Bottom Left above HUD) */}
-      <div className="absolute top-12 left-3 z-20 flex items-center gap-2 pointer-events-none">
+      {/* Floating Info & Night Mode Highlight Pill */}
+      <div className="absolute bottom-20 left-3 z-20 flex flex-wrap items-center gap-1.5 pointer-events-none">
         {is3DMode && (
           <div className="px-2.5 py-1 rounded-xl bg-lime-400 text-slate-950 font-black text-[10px] tracking-wider uppercase shadow-lg shadow-lime-500/20 border border-lime-300">
             Modo 3D Ativo
           </div>
         )}
         {activeLayer === 'dark' && (
-          <div className="px-2.5 py-1 rounded-xl bg-indigo-600 text-white font-black text-[10px] tracking-wider uppercase shadow-lg shadow-indigo-500/20 border border-indigo-400">
-            🌙 Noturno Futurista
+          <div className="px-2.5 py-1 rounded-xl bg-indigo-950/90 text-amber-300 font-black text-[10px] shadow-lg border border-amber-400/60 flex items-center gap-1.5">
+            <span>🌙 Modo Noturno Ativo • 💡 Destacando Vias Sem Iluminação e 🚫 Sem Sinalização</span>
           </div>
         )}
       </div>

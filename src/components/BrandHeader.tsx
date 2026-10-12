@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bell, 
   Menu, 
@@ -8,6 +8,7 @@ import {
   Navigation2,
   MapPin,
   Mic,
+  Clock,
   Route as RouteIcon
 } from 'lucide-react';
 import type { UserProfile, WeatherData } from '../types';
@@ -26,6 +27,7 @@ interface BrandHeaderProps {
   onOpenRoutePlanner?: () => void;
   onOpenTrafficOccurrences?: () => void;
   onOpenRadars?: () => void;
+  onOpenPhotoIncident?: () => void;
   activeOccurrencesCount: number;
   detectedLocation?: string;
   weatherData?: WeatherData | null;
@@ -43,16 +45,39 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
   openMenuDrawer,
   openNotificationsModal,
   onOpenRoutePlanner,
-  onOpenTrafficOccurrences,
-  onOpenRadars,
+  onOpenPhotoIncident,
   activeOccurrencesCount,
   detectedLocation = 'GPS ao vivo',
   weatherData,
   onRecenterGPS,
   gpsAccuracy,
 }) => {
+  const [now, setNow] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const isRaining = weatherData && (weatherData.isRaining || weatherData.rainProbability >= 40);
   const currentTemp = weatherData ? `${weatherData.currentTemp}°` : '26°';
+
+  const hour = now.getHours();
+  const isNightTime = hour >= 18 || hour < 6;
+  const formattedTime = now.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  const formattedDate = now.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const weekdayRaw = now.toLocaleDateString('pt-BR', { weekday: 'long' });
+  const formattedWeekday = weekdayRaw.charAt(0).toUpperCase() + weekdayRaw.slice(1);
 
   return (
     <header className="bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/80 text-white px-3 sm:px-4 py-2 safe-top-header safe-x-pad shadow-2xl shadow-black/80 sticky top-0 z-[1000] transition-all">
@@ -106,8 +131,49 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
           </div>
         </div>
 
+        {/* Live Date, Day & Time Pill (with Automatic Night Mode Indicator) */}
+        <div
+          className={`hidden md:flex items-center gap-2 px-3 py-1 rounded-xl border text-[11px] font-bold shadow-inner ${
+            isNightTime
+              ? 'bg-indigo-950/70 border-indigo-500/50 text-indigo-200'
+              : 'bg-slate-900/90 border-slate-700/80 text-slate-200'
+          }`}
+          title={
+            isNightTime
+              ? 'Horário Noturno Ativo: Mapa em Modo Noturno com destaque de iluminação e sinalização'
+              : 'Relógio e Calendário em Tempo Real Tô Passando'
+          }
+        >
+          <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+          <span className="font-mono font-black text-white tracking-wider">{formattedTime}</span>
+          <span className="text-slate-600">•</span>
+          <span className="text-cyan-300">{formattedWeekday}</span>
+          <span className="text-slate-400 font-mono">{formattedDate}</span>
+          <span
+            className={`px-1.5 py-0.2 rounded text-[9px] font-black uppercase ${
+              isNightTime
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+            }`}
+          >
+            {isNightTime ? '🌙 Noturno Auto' : '☀️ Diurno'}
+          </span>
+        </div>
+
         {/* Center / Right: Action items */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Quick Camera / Mark Spot on Map Button */}
+          {onOpenPhotoIncident && (
+            <button
+              onClick={onOpenPhotoIncident}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-600/90 hover:bg-rose-500 text-white text-xs font-black shadow-md shadow-rose-600/30 border border-rose-400/50 active:scale-95 transition-all"
+              title="Marcar Local de Roubo ou Problema na Via com Foto em Tempo Real"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Marcar + Foto</span>
+            </button>
+          )}
+
           {/* Tô Passando Nesse Momento Live Map Button */}
           <button
             onClick={() => setActivePanel('map')}
@@ -119,8 +185,8 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
             title="Mapa Ao Vivo Tô Passando Nesse Momento"
           >
             <Navigation2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Tô Passando Nesse Momento</span>
-            <span className="sm:hidden">Nesse Momento</span>
+            <span className="hidden lg:inline">Tô Passando Nesse Momento</span>
+            <span className="lg:hidden">Nesse Momento</span>
           </button>
 
           {/* Prominent Direct "Rotas" Button in Header */}
