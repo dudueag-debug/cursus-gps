@@ -79,7 +79,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   const [activeMapCategory, setActiveMapCategory] = useState<string>('all');
   const [selectedMapPlace, setSelectedMapPlace] = useState<Place | null>(null);
 
-  // Professional Watermark-Free Layer Definitions for Brazil & Worldwide (Default = Waze World Cartography)
+  // Professional Watermark-Free Layer Definitions for Brazil & Worldwide
   const getLayerConfig = (layer: MapLayerType) => {
     switch (layer) {
       case 'satellite':
@@ -87,21 +87,21 @@ export const GPSMap: React.FC<GPSMapProps> = ({
           url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           maxZoom: 19,
           className: '',
-          attribution: '&copy; Esri World Imagery &bull; CURSUS GPS',
+          attribution: '&copy; TÔ PASSANDO Satélite HD',
         };
       case 'topo':
         return {
           url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
           maxZoom: 19,
           className: '',
-          attribution: '&copy; Esri Topo &bull; CURSUS GPS',
+          attribution: '&copy; TÔ PASSANDO Topografia',
         };
       case 'dark':
         return {
           url: 'https://worldtiles3.waze.com/tiles/{z}/{x}/{y}.png',
           maxZoom: 19,
           className: 'leaflet-tile-futuristic-dark',
-          attribution: '&copy; Waze Cartography &bull; CURSUS GPS Noturno',
+          attribution: '&copy; TÔ PASSANDO Noturno Futurista',
         };
       case 'streets':
       default:
@@ -109,7 +109,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
           url: 'https://worldtiles3.waze.com/tiles/{z}/{x}/{y}.png',
           maxZoom: 19,
           className: '',
-          attribution: '&copy; Waze Live Cartography &bull; CURSUS GPS',
+          attribution: '&copy; TÔ PASSANDO Cartografia Ao Vivo',
         };
     }
   };
@@ -442,7 +442,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         <div class="text-xs p-1.5 font-semibold max-w-[220px]">
           <div class="font-black text-slate-900">${badgeEmoji} ${occ.title}</div>
           <div class="text-[10px] text-slate-700 mt-0.5">${occ.description || ''}</div>
-          <div class="text-[10px] text-cyan-800 font-bold mt-1">${isResolved ? '✅ Normalizada' : '🔴 Ativa no Waze/Cursus'} • 👍 ${occ.confirmationsCount} confirmações</div>
+          <div class="text-[10px] text-cyan-800 font-bold mt-1">${isResolved ? '✅ Normalizada' : '🔴 Ativa no Tô Passando'} • 👍 ${occ.confirmationsCount} confirmações</div>
         </div>
       `, { direction: 'top', offset: [0, -14] });
 
@@ -675,17 +675,17 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         />
       </div>
 
-      {/* Top Floating Bar: Waze Mode Switch + Neighborhood Commerce & Services Chips */}
+      {/* Top Floating Bar: Tô Passando Nesse Momento Switch + Neighborhood Commerce & Services Chips */}
       {!isNavigating && (
         <div className="absolute top-2.5 left-2.5 right-16 z-30 flex flex-col gap-1.5 pointer-events-none">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto pb-1">
             {onOpenWazeLive && (
               <button
-                onClick={() => onOpenWazeLive(currentLocation, 'Trânsito & Waze ao Vivo')}
+                onClick={() => onOpenWazeLive(currentLocation, 'Tô Passando Nesse Momento')}
                 className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-[11px] shadow-xl border border-cyan-300 active:scale-95 transition-all"
               >
                 <Compass className="w-3.5 h-3.5 text-slate-950 animate-spin" style={{ animationDuration: '9s' }} />
-                <span>Waze Live Oficial (Iframe)</span>
+                <span>Tô Passando Nesse Momento</span>
               </button>
             )}
 
@@ -694,7 +694,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 onClick={onOpenOccurrences}
                 className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-slate-950/90 hover:bg-slate-900 text-amber-300 font-black text-[11px] shadow-xl border border-amber-500/40 active:scale-95 transition-all"
               >
-                <span>👮📸 Alertas Waze ({occurrences.length})</span>
+                <span>👮📸 Alertas na Via ({occurrences.length})</span>
               </button>
             )}
 
@@ -719,7 +719,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         </div>
       )}
 
-      {/* Floating Selected Establishment Card (Real Photo + Google Rating + Verified Reference Point + Route Action) */}
+      {/* Floating Selected Establishment Card (Real Photo + Star Rating + Verified Reference Point + Route Action) */}
       {selectedMapPlace && !isNavigating && (
         <div className="absolute top-14 left-3 right-16 sm:right-auto sm:w-[390px] z-30 bg-slate-950/95 border border-cyan-500/50 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="relative h-32 w-full bg-slate-900 overflow-hidden">
@@ -806,24 +806,14 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 <span>Traçar Rota Agora</span>
               </button>
 
-              {onOpenWazeLive ? (
+              {onOpenWazeLive && (
                 <button
                   onClick={() => onOpenWazeLive(selectedMapPlace.coordinates, selectedMapPlace.name)}
                   className="py-2 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-black text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Abrir no Waze Live</span>
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>Nesse Momento</span>
                 </button>
-              ) : (
-                <a
-                  href={`https://waze.com/ul?ll=${selectedMapPlace.coordinates.lat},${selectedMapPlace.coordinates.lng}&navigate=yes`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="py-2 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-black text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Ir com Waze</span>
-                </a>
               )}
             </div>
 
@@ -869,7 +859,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
               ? 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-500/30'
               : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700/80'
           }`}
-          title={activeLayer === 'dark' ? 'Modo Noturno Futurista Ativo (Clique para Waze Diurno)' : 'Ativar Modo Noturno Futurista'}
+          title={activeLayer === 'dark' ? 'Modo Noturno Futurista Ativo (Clique para Diurno)' : 'Ativar Modo Noturno Futurista'}
         >
           <span className="text-base leading-none select-none">🌙</span>
         </button>
@@ -896,7 +886,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 ? 'bg-blue-600 text-white border-blue-400'
                 : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-slate-700/80'
             }`}
-            title="Escolher Camadas (Mapa Waze / Satélite / Relevo)"
+            title="Escolher Camadas (Mapa Tô Passando / Satélite / Relevo)"
           >
             <Layers className="w-5 h-5" />
           </button>
@@ -917,7 +907,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 }`}
               >
                 <MapIcon className="w-4 h-4 text-lime-400" />
-                <span>🧭 Mapa Waze (Ruas Ao Vivo)</span>
+                <span>🧭 Mapa Tô Passando (Ruas Ao Vivo)</span>
               </button>
 
               <button
@@ -953,7 +943,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 }`}
               >
                 <Box className="w-4 h-4 text-indigo-400" />
-                <span>🌙 Waze Noturno Futurista</span>
+                <span>🌙 Tô Passando Noturno</span>
               </button>
             </div>
           )}

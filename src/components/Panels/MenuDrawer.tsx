@@ -137,13 +137,13 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
 
           {/* Menu Items List */}
           <div className="space-y-1.5 text-xs font-semibold text-slate-300">
-            {/* Waze ao Vivo Dedicated View */}
+            {/* Tô Passando Nesse Momento Dedicated View */}
             <button
               onClick={() => { onOpenWazeLive?.(); onClose(); }}
               className="w-full p-2.5 rounded-xl hover:bg-cyan-950/60 flex items-center gap-3 text-left transition-colors text-cyan-300 font-bold bg-gradient-to-r from-cyan-950/80 via-blue-950/40 to-slate-900 border border-cyan-400/50 shadow-sm"
             >
               <RouteIcon className="w-4 h-4 text-cyan-400" />
-              <span>🧭 Waze ao Vivo (Mapa & Trânsito Oficial)</span>
+              <span>🧭 Tô Passando Nesse Momento (Trânsito Ao Vivo)</span>
             </button>
 
             {/* Planejador de Rotas Principal */}

@@ -272,10 +272,10 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <h2 className="text-xs sm:text-sm font-black tracking-tight text-white truncate">
-                  WAZE AO VIVO • TRÂNSITO EM TEMPO REAL
+                  TÔ PASSANDO NESSE MOMENTO • TRÂNSITO EM TEMPO REAL
                 </h2>
                 <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                  Embed Oficial
+                  Ao Vivo
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 truncate">
@@ -299,13 +299,13 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
             <button
               onClick={handleCenterOnDuqueDeCaxias}
               className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all"
-              title="Visualizar Duque de Caxias - RJ (Mapa de Referência)"
+              title="Visualizar Duque de Caxias - RJ"
             >
               <MapPin className="w-3.5 h-3.5 text-cyan-400" />
               <span>Duque de Caxias</span>
             </button>
 
-            {/* Zoom Controls respecting Waze allowed levels (3-17) */}
+            {/* Zoom Controls (3-17) */}
             <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
               <button
                 onClick={() => {
@@ -313,7 +313,7 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
                   setIsLoadingIframe(true);
                 }}
                 className="p-1.5 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-                title="Diminuir Zoom no Waze"
+                title="Diminuir Zoom"
               >
                 <ZoomOut className="w-3.5 h-3.5" />
               </button>
@@ -324,7 +324,7 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
                   setIsLoadingIframe(true);
                 }}
                 className="p-1.5 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-                title="Aumentar Zoom no Waze"
+                title="Aumentar Zoom"
               >
                 <ZoomIn className="w-3.5 h-3.5" />
               </button>
@@ -343,7 +343,7 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
                 onClick={onBackToCursusMap}
                 className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold active:scale-95 transition-all"
               >
-                Mapa Cursus
+                Mapa Principal
               </button>
             )}
           </div>
@@ -358,7 +358,7 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={e => handleSearchChange(e.target.value)}
-                placeholder="Pesquisar destino, rua, bairro, mercado, UPA ou oficina para ver no Waze ao Vivo..."
+                placeholder="Pesquisar destino, rua, bairro, mercado, UPA ou oficina no Tô Passando Nesse Momento..."
                 className="w-full bg-slate-900 border border-slate-700/90 rounded-xl pl-9 pr-20 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400"
               />
               {searchQuery && (
@@ -382,18 +382,18 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
               </button>
             </div>
 
-            {/* Direct Waze External Action Button */}
-            <a
-              href={directWazeRouteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-500/20 shrink-0 active:scale-95 transition-all"
-              title="Abrir percurso completo diretamente no Waze"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Abrir Percurso no Waze</span>
-              <span className="sm:hidden">No Waze</span>
-            </a>
+            {onTraceInCursus && (
+              <button
+                type="button"
+                onClick={() => onTraceInCursus(mapCenter, activeLabel)}
+                className="px-3 py-2 rounded-xl bg-gradient-to-r from-lime-400 to-emerald-500 hover:brightness-110 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg shadow-lime-500/20 shrink-0 active:scale-95 transition-all"
+                title="Traçar rota inteligente no Tô Passando"
+              >
+                <RouteIcon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Traçar Rota no Tô Passando</span>
+                <span className="sm:hidden">Traçar Rota</span>
+              </button>
+            )}
           </form>
 
           {/* Search Suggestions Dropdown with Real Photos, Ratings & Reference Points */}
@@ -428,7 +428,7 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
                     )}
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700/50 font-bold">
-                    Centralizar Waze
+                    Centralizar
                   </span>
                 </div>
               ))}
@@ -545,7 +545,7 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
         </div>
       </div>
 
-      {/* Main Responsive Waze Live Map Iframe Area (Maximized Viewport) */}
+      {/* Main Responsive Live Map Iframe Area (Maximized Viewport) */}
       <div className="relative flex-1 w-full h-full min-h-[320px] bg-slate-900">
         {!isOnline || iframeError ? (
           <div className="absolute inset-0 z-20 bg-slate-950 flex flex-col items-center justify-center p-6 text-center gap-4">
@@ -554,10 +554,10 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
             </div>
             <div className="max-w-md space-y-1.5">
               <h3 className="text-base font-black text-white">
-                Mapa Ao Vivo do Waze Temporariamente Indisponível
+                Tô Passando Nesse Momento Temporariamente Indisponível
               </h3>
               <p className="text-xs text-slate-400">
-                Verifique sua conexão com a internet ou utilize os botões abaixo para abrir o percurso diretamente no aplicativo/site oficial do Waze ou retornar ao mapa nativo do Cursus GPS.
+                Verifique sua conexão com a internet ou utilize os botões abaixo para recarregar ou retornar ao mapa principal do Tô Passando.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2.5">
@@ -568,15 +568,15 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
                 <RefreshCw className="w-4 h-4 text-cyan-400" />
                 <span>Tentar Novamente</span>
               </button>
-              <a
-                href={directWazeRouteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg"
-              >
-                <ExternalLink className="w-4 h-4" />
-                <span>Abrir Diretamente no Waze</span>
-              </a>
+              {onBackToCursusMap && (
+                <button
+                  onClick={onBackToCursusMap}
+                  className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg"
+                >
+                  <Navigation className="w-4 h-4" />
+                  <span>Voltar ao Mapa Principal</span>
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -584,14 +584,14 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
             {isLoadingIframe && (
               <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-slate-950/90 border border-cyan-500/40 text-cyan-300 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-xl backdrop-blur-md">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-cyan-400" />
-                <span>Sincronizando Waze Live Map em tempo real...</span>
+                <span>Sincronizando Tô Passando Nesse Momento em tempo real...</span>
               </div>
             )}
 
             <iframe
               key={`${iframeKey}-${mapCenter.lat.toFixed(5)}-${mapCenter.lng.toFixed(5)}-${zoom}`}
               src={embedUrl}
-              title="Waze Live Map Oficial — Cursus GPS"
+              title="Tô Passando Nesse Momento — Trânsito em Tempo Real"
               className="w-full h-full border-0"
               allow="geolocation; fullscreen"
               loading="eager"
@@ -605,7 +605,7 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
           </>
         )}
 
-        {/* Floating Destination Card (Real Photo + Google Rating + Verified Reference Point + Waze Links) */}
+        {/* Floating Destination Card (Real Photo + Star Rating + Verified Reference Point + Route Actions) */}
         <div className="absolute bottom-3 left-3 right-3 sm:left-4 sm:right-auto sm:w-[430px] z-20 pointer-events-auto">
           <div className="bg-slate-950/95 backdrop-blur-xl border border-slate-800 rounded-2xl p-3 shadow-2xl flex flex-col gap-2.5">
             {/* Header of floating card */}
@@ -670,56 +670,25 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
                   </div>
                 )}
 
-                {/* Action Buttons: Open in Waze App, Open Reference Route, or Trace in Cursus */}
-                <div className="grid grid-cols-2 gap-1.5">
-                  <a
-                    href={directWazeAppUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="py-2 px-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-slate-950 font-black text-[11px] flex items-center justify-center gap-1.5 shadow-md"
-                  >
-                    <Navigation className="w-3.5 h-3.5 fill-slate-950" />
-                    <span>Navegar no App Waze</span>
-                  </a>
-
-                  <a
-                    href={directWazeRouteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 font-bold text-[11px] flex items-center justify-center gap-1.5"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Rota no Waze Web</span>
-                  </a>
-
+                {/* Action Buttons */}
+                <div className="grid grid-cols-1 gap-1.5">
                   {onTraceInCursus && (
                     <button
                       onClick={() => onTraceInCursus(mapCenter, activeLabel)}
-                      className="col-span-2 py-2 px-2.5 rounded-xl bg-lime-500/15 hover:bg-lime-500/25 border border-lime-500/40 text-lime-300 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+                      className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-lime-400 to-emerald-500 hover:brightness-110 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all"
                     >
-                      <RouteIcon className="w-3.5 h-3.5 text-lime-400" />
-                      <span>Comparar 3 Rotas Inteligentes no Cursus GPS</span>
+                      <RouteIcon className="w-4 h-4 text-slate-950" />
+                      <span>Traçar 3 Rotas Inteligentes no Tô Passando</span>
                     </button>
                   )}
                 </div>
 
-                {/* Owner Reference Route Link (Duque de Caxias - RJ) & Transparency Note */}
-                <div className="pt-1 border-t border-slate-800/90 flex flex-col gap-1 text-[10px] text-slate-400">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1 text-slate-400">
-                      <Info className="w-3 h-3 text-cyan-400 shrink-0" />
-                      <span>Visualização oficial Waze Embed.</span>
-                    </span>
-                    <a
-                      href={OWNER_REFERENCE_WAZE_DIRECTIONS_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-cyan-400 hover:underline font-semibold flex items-center gap-1 shrink-0"
-                    >
-                      <span>Rota Ref. Duque de Caxias</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
-                  </div>
+                {/* Status Footer */}
+                <div className="pt-1 border-t border-slate-800/90 flex items-center justify-between text-[10px] text-slate-400">
+                  <span className="flex items-center gap-1 text-slate-400">
+                    <Info className="w-3 h-3 text-cyan-400 shrink-0" />
+                    <span>Monitoramento em tempo real • Tô Passando Nesse Momento</span>
+                  </span>
                 </div>
               </>
             )}

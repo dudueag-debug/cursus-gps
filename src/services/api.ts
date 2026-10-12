@@ -45,7 +45,7 @@ const initialOccurrences: Occurrence[] = [
     locationName: 'Corredor Principal • Próximo a você',
     coordinates: { lat: -22.9048, lng: -43.1805 },
     sourceType: 'community',
-    sourceName: 'Comunidade Waze & Cursus',
+    sourceName: 'Comunidade Tô Passando',
     status: 'confirmada_comunidade',
     createdAt: new Date(Date.now() - 1200000).toISOString(),
     updatedAt: new Date(Date.now() - 300000).toISOString(),
