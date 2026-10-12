@@ -605,7 +605,7 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
             })}
           </div>
 
-          {/* Action CTA to Start Navigation + Tô Passando Nesse Momento Integration */}
+          {/* Action CTA to Start Navigation */}
           <div className="flex flex-col gap-2 mt-1">
             <button
               onClick={onStartNavigation}
@@ -614,22 +614,6 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
               <Navigation className="w-4 h-4 fill-slate-950" />
               <span>INICIAR NAVEGAÇÃO TÔ PASSANDO</span>
             </button>
-
-            {onOpenInWazeLive && (
-              <button
-                type="button"
-                onClick={() => {
-                  const target =
-                    destCoords ||
-                    selectedRoute.coordinates[selectedRoute.coordinates.length - 1];
-                  onOpenInWazeLive(target, destText || selectedRoute.title || 'Destino');
-                }}
-                className="w-full py-2.5 px-3 rounded-xl bg-cyan-950/70 hover:bg-cyan-900/70 border border-cyan-500/40 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Navigation className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Ver no Tô Passando Nesse Momento</span>
-              </button>
-            )}
           </div>
         </div>
       )}

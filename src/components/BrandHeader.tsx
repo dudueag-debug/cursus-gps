@@ -108,15 +108,15 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
 
         {/* Center / Right: Action items */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Tô Passando Nesse Momento Dedicated Area Toggle */}
+          {/* Tô Passando Nesse Momento Live Map Button */}
           <button
-            onClick={() => setActivePanel(activePanel === 'waze' ? 'map' : 'waze')}
+            onClick={() => setActivePanel('map')}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black shadow-md active:scale-95 transition-all border ${
-              activePanel === 'waze'
+              activePanel === 'map'
                 ? 'bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-400/30'
                 : 'bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border-cyan-500/40'
             }`}
-            title="Abrir Tô Passando Nesse Momento (Mapa & Trânsito em Tempo Real)"
+            title="Mapa Ao Vivo Tô Passando Nesse Momento"
           >
             <Navigation2 className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Tô Passando Nesse Momento</span>

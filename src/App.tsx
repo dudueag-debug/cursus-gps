@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrandHeader } from './components/BrandHeader';
 import { GPSMap } from './components/Map/GPSMap';
-import { WazeLiveMapView } from './components/Map/WazeLiveMapView';
 import { RoutePlanner } from './components/Navigation/RoutePlanner';
 import { TurnByTurnOverlay } from './components/Navigation/TurnByTurnOverlay';
 import { CentralDeLocais } from './components/Panels/CentralDeLocais';
@@ -88,8 +87,6 @@ export function App() {
 
   // Active Navigation & View State
   const [activePanel, setActivePanel] = useState<'map' | 'waze' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile'>('map');
-  const [wazeTargetCoords, setWazeTargetCoords] = useState<Coordinates | null>(null);
-  const [wazeTargetLabel, setWazeTargetLabel] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
 
   // Geographic Coordinates (Real GPS or Cached Coordinates)
@@ -776,34 +773,9 @@ export function App() {
         }}
       />
 
-      {/* Main Content Area */}
+      {/* Main Content Area — Exclusively our Tô Passando Live Map */}
       <main className="flex-1 relative flex flex-col lg:flex-row overflow-hidden">
-        {activePanel === 'waze' ? (
-          <div className="flex-1 relative h-full w-full min-h-0 flex flex-col">
-            <WazeLiveMapView
-              userCoords={currentLocation}
-              detectedLocationName={detectedLocationName}
-              gpsAccuracy={gpsAccuracy}
-              selectedRoute={selectedRoute}
-              places={places}
-              initialTargetCoords={wazeTargetCoords}
-              initialTargetLabel={wazeTargetLabel}
-              onBackToCursusMap={() => setActivePanel('map')}
-              onTraceInCursus={async (destCoords, destLabel) => {
-                try {
-                  const data = await api.calculateRoute(currentLocation, destCoords, user.preferredMode);
-                  handleRouteCalculated(data.routes, 0);
-                  setActivePanel('map');
-                  speakText(`Calculando 3 rotas inteligentes no Cursus GPS para ${destLabel}`);
-                } catch (e) {
-                  console.error(e);
-                  setActivePanel('map');
-                }
-              }}
-            />
-          </div>
-        ) : (
-        /* Map Area */
+        {/* Map Area */}
         <div className="flex-1 relative h-full w-full min-h-0">
           <GPSMap
             currentLocation={currentLocation}
@@ -823,10 +795,9 @@ export function App() {
             onOpenOccurrences={() => setActivePanel('occurrences')}
             onFindCategory={handleFindNearest}
             onOpenPlacesPanel={() => setActivePanel('places')}
-            onOpenWazeLive={(coords, label) => {
-              if (coords) setWazeTargetCoords(coords);
-              if (label) setWazeTargetLabel(label);
-              setActivePanel('waze');
+            onOpenWazeLive={(coords) => {
+              if (coords) setCurrentLocation(coords);
+              setActivePanel('map');
             }}
             onUpdateLocation={(coords) => {
               locationService.reverseGeocode(coords).then(rev => {
@@ -908,7 +879,6 @@ export function App() {
             </div>
           )}
         </div>
-        )}
 
         {/* Mobile Route Planner Drawer */}
         {!isNavigating && isMobilePlannerOpen && (
@@ -941,11 +911,10 @@ export function App() {
                   setIsVoiceModalOpen(true);
                   voice.startListening();
                 }}
-                onOpenInWazeLive={(coords, label) => {
-                  setWazeTargetCoords(coords);
-                  setWazeTargetLabel(label);
+                onOpenInWazeLive={(coords) => {
+                  if (coords) setCurrentLocation(coords);
                   setIsMobilePlannerOpen(false);
-                  setActivePanel('waze');
+                  setActivePanel('map');
                 }}
               />
             </div>
@@ -1011,10 +980,9 @@ export function App() {
                 setIsVoiceModalOpen(true);
                 voice.startListening();
               }}
-              onOpenInWazeLive={(coords, label) => {
-                setWazeTargetCoords(coords);
-                setWazeTargetLabel(label);
-                setActivePanel('waze');
+              onOpenInWazeLive={(coords) => {
+                if (coords) setCurrentLocation(coords);
+                setActivePanel('map');
               }}
             />
           </div>
@@ -1226,7 +1194,7 @@ export function App() {
         onOpenOfflineRegions={() => setIsOfflineRegionsModalOpen(true)}
         onOpenObservability={() => setIsObservabilityModalOpen(true)}
         onOpenBrazilTouristMap={() => setIsBrazilTouristMapOpen(true)}
-        onOpenWazeLive={() => setActivePanel('waze')}
+        onOpenWazeLive={() => setActivePanel('map')}
       />
 
       {/* Camadas do Mapa (14 Camadas) Modal */}

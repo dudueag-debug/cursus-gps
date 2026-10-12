@@ -679,15 +679,13 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       {!isNavigating && (
         <div className="absolute top-2.5 left-2.5 right-16 z-30 flex flex-col gap-1.5 pointer-events-none">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto pb-1">
-            {onOpenWazeLive && (
-              <button
-                onClick={() => onOpenWazeLive(currentLocation, 'Tô Passando Nesse Momento')}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-[11px] shadow-xl border border-cyan-300 active:scale-95 transition-all"
-              >
-                <Compass className="w-3.5 h-3.5 text-slate-950 animate-spin" style={{ animationDuration: '9s' }} />
-                <span>Tô Passando Nesse Momento</span>
-              </button>
-            )}
+            <button
+              onClick={handleRecenter}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-[11px] shadow-xl border border-cyan-300 active:scale-95 transition-all"
+            >
+              <Compass className="w-3.5 h-3.5 text-slate-950 animate-spin" style={{ animationDuration: '9s' }} />
+              <span>Tô Passando Nesse Momento</span>
+            </button>
 
             {onOpenOccurrences && (
               <button
@@ -794,27 +792,17 @@ export const GPSMap: React.FC<GPSMapProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-1.5 pt-1">
+            <div className="pt-1">
               <button
                 onClick={() => {
                   if (onSelectPlace) onSelectPlace(selectedMapPlace);
                   setSelectedMapPlace(null);
                 }}
-                className="py-2 px-3 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-black text-[11px] flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition-all"
+                className="w-full py-2.5 px-3 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition-all"
               >
                 <Navigation className="w-3.5 h-3.5" />
-                <span>Traçar Rota Agora</span>
+                <span>Traçar Rota Agora no Tô Passando</span>
               </button>
-
-              {onOpenWazeLive && (
-                <button
-                  onClick={() => onOpenWazeLive(selectedMapPlace.coordinates, selectedMapPlace.name)}
-                  className="py-2 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-black text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-                >
-                  <Compass className="w-3.5 h-3.5" />
-                  <span>Nesse Momento</span>
-                </button>
-              )}
             </div>
 
             {selectedMapPlace.phone && (

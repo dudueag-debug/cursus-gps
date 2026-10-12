@@ -580,29 +580,9 @@ export const WazeLiveMapView: React.FC<WazeLiveMapViewProps> = ({
             </div>
           </div>
         ) : (
-          <>
-            {isLoadingIframe && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-slate-950/90 border border-cyan-500/40 text-cyan-300 px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-xl backdrop-blur-md">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-cyan-400" />
-                <span>Sincronizando Tô Passando Nesse Momento em tempo real...</span>
-              </div>
-            )}
-
-            <iframe
-              key={`${iframeKey}-${mapCenter.lat.toFixed(5)}-${mapCenter.lng.toFixed(5)}-${zoom}`}
-              src={embedUrl}
-              title="Tô Passando Nesse Momento — Trânsito em Tempo Real"
-              className="w-full h-full border-0"
-              allow="geolocation; fullscreen"
-              loading="eager"
-              referrerPolicy="no-referrer-when-downgrade"
-              onLoad={() => setIsLoadingIframe(false)}
-              onError={() => {
-                setIsLoadingIframe(false);
-                setIframeError(true);
-              }}
-            />
-          </>
+          <div className="w-full h-full flex items-center justify-center bg-slate-950 text-slate-400 text-xs font-bold">
+            Mapa Principal Tô Passando Nesse Momento Ativo
+          </div>
         )}
 
         {/* Floating Destination Card (Real Photo + Star Rating + Verified Reference Point + Route Actions) */}
