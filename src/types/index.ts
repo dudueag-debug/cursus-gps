@@ -1,6 +1,6 @@
-export type TransportMode = 'car' | 'motorcycle' | 'bus' | 'train' | 'subway' | 'walk' | 'multimodal';
+export type TransportMode = 'car' | 'motorcycle' | 'truck' | 'bike' | 'bus' | 'train' | 'subway' | 'walk' | 'multimodal';
 
-export type VehicleModel = 'sport' | 'sedan' | 'suv' | 'motorcycle_sport' | 'motorcycle_scooter' | 'van' | 'walker';
+export type VehicleModel = 'sport' | 'sedan' | 'suv' | 'truck' | 'motorcycle_sport' | 'motorcycle_scooter' | 'van' | 'walker' | 'bicycle';
 
 export type VehicleColor = 'lime' | 'electric_blue' | 'cyber_yellow' | 'ruby_red' | 'silver' | 'stealth_dark';
 
@@ -20,6 +20,19 @@ export interface ActiveMapLayers {
 
 // Fundamental Data Precision Classification
 export type DataOriginType = 'real' | 'estimated' | 'reported' | 'historical';
+
+export interface HomeAddress {
+  address: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  cep?: string;
+  formattedAddress?: string;
+  coordinates: Coordinates;
+  savedAt: string;
+}
 
 export interface UserProfile {
   id: string;
@@ -44,6 +57,7 @@ export interface UserProfile {
   themeMode?: 'dark' | 'light';
   detectedState?: string;
   detectedCity?: string;
+  homeAddress?: HomeAddress | null;
   privacy: {
     shareLocationWithCommunity: boolean;
     saveRouteHistory: boolean;
@@ -74,6 +88,14 @@ export interface GeocodeResult {
   type: 'address' | 'cep' | 'poi' | 'city' | 'history' | 'sport';
   provider: 'viacep' | 'nominatim' | 'internal';
   dataOrigin?: DataOriginType;
+  photoUrl?: string;
+  photoAttribution?: string;
+  verifiedReferencePoint?: string;
+  accessNotes?: string;
+  rating?: number;
+  ratingCount?: number;
+  subCategory?: string;
+  phone?: string;
 }
 
 export interface RouteStep {
@@ -88,10 +110,19 @@ export interface RouteStep {
   coordinates: Coordinates;
 }
 
+export interface RouteCostEstimate {
+  fuelLiters: number;
+  fuelCostBrl: number;
+  tollCostBrl: number;
+  totalCostBrl: number;
+  fuelPricePerLiter: number;
+}
+
 export interface RouteOption {
   id: string;
   title: string;
   mode: TransportMode;
+  routeCategory?: 'fastest' | 'safest' | 'economical';
   totalDistanceMeters: number;
   totalDurationSeconds: number;
   eta: string;
@@ -102,6 +133,9 @@ export interface RouteOption {
   steps: RouteStep[];
   isAlternative?: boolean;
   dataOrigin: DataOriginType;
+  safetyScore?: number; // 0.0 - 10.0
+  costEstimate?: RouteCostEstimate;
+  copilotPitch?: string;
   multimodalSegments?: {
     mode: TransportMode;
     label: string;
@@ -111,21 +145,26 @@ export interface RouteOption {
   }[];
 }
 
-// 12 Explicit Highway Warning Types
+// 12+ Explicit Highway Warning Types (including Waze Speed Cameras & Roadworks)
 export type OccurrenceCategory = 
   | 'engarrafamento'
+  | 'congestionamento'
   | 'alagamento'
   | 'buraco'
   | 'objeto_via'
   | 'veiculo_parado'
   | 'acidente'
   | 'blitz'
+  | 'radar'
   | 'via_parcialmente_interditada'
   | 'via_interditada'
   | 'acesso_fechado'
+  | 'animal_pista'
+  | 'incendio'
   | 'ponto_roubo'
   | 'local_perigoso'
   | 'obras'
+  | 'obra'
   | 'recapeamento'
   | 'oleo_pista'
   | 'areia_lama'
@@ -142,6 +181,7 @@ export type OccurrenceStatus =
   | 'planejada'
   | 'em_andamento'
   | 'relatada_comunidade'
+  | 'confirmada_comunidade'
   | 'aguardando_confirmacao'
   | 'confirmada_oficial'
   | 'resolvida'
@@ -179,20 +219,49 @@ export interface Occurrence {
   normalizationMessage?: string;
   dataOrigin: DataOriginType;
   confidenceScore: number; // 0 - 100%
+  photoUrl?: string;
+  isAiValidated?: boolean;
+  aiConfidencePercent?: number;
 }
 
 export type PlaceCategory = 
   | 'saude'
+  | 'upa'
+  | 'hospital'
+  | 'posto_saude'
   | 'posto_gnv'
   | 'borracheiro'
+  | 'oficina'
+  | 'funilaria_pintura'
   | 'policia'
+  | 'delegacia'
+  | 'batalhao'
+  | 'dpo'
+  | 'presidio'
   | 'reboque_socorro'
   | 'bateria_auto'
   | 'comercio_servicos'
   | 'mercado'
+  | 'supermercado'
+  | 'material_construcao'
+  | 'farmacia'
+  | 'padaria'
+  | 'banco_caixa'
+  | 'recarga_jae'
+  | 'educacao'
+  | 'escola'
+  | 'faculdade'
+  | 'curso_tecnico'
+  | 'igreja'
   | 'lazer_cultura'
+  | 'shopping'
+  | 'parque_praia'
+  | 'zoologico'
   | 'transporte_infraestrutura'
+  | 'brt_transporte'
   | 'esporte'
+  | 'paintball'
+  | 'shows_eventos'
   | 'turismo'
   | 'alimentacao'
   | 'hospedagem'
@@ -204,6 +273,9 @@ export interface Place {
   category: PlaceCategory;
   subCategory: string;
   address: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
   cep?: string;
   coordinates: Coordinates;
   phone?: string;
@@ -214,10 +286,19 @@ export interface Place {
   is24h?: boolean;
   hasGNV?: boolean;
   rating?: number;
+  ratingCount?: number;
   source: 'openstreetmap' | 'curated' | 'community' | 'official';
+  officialSource?: string;
+  lastVerifiedDate?: string;
+  verificationLevel?: 'oficial_confirmada' | 'fonte_aberta_auditada' | 'colaborativa';
+  unitType?: 'upa' | 'hospital_publico' | 'hospital_privado' | 'ubs_posto' | 'delegacia_civil' | 'batalhao_pm' | 'dpo_confirmado' | 'comercio' | 'servico';
   distanceMeters?: number;
+  estimatedDurationSeconds?: number;
   dataOrigin: DataOriginType;
   photoUrl?: string;
+  photoAttribution?: string;
+  verifiedReferencePoint?: string;
+  accessNotes?: string;
   entryPrice?: string;
   description?: string;
 }

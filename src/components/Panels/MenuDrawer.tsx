@@ -15,7 +15,10 @@ import {
   Radar,
   Info,
   CloudSun,
-  Flame
+  Flame,
+  Activity,
+  Landmark,
+  Route as RouteIcon
 } from 'lucide-react';
 import type { UserProfile } from '../../types';
 
@@ -23,6 +26,7 @@ interface MenuDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile;
+  onOpenRoutePlanner?: () => void;
   onOpenProfile: () => void;
   onOpenSafety: () => void;
   onOpenCulture: () => void;
@@ -36,12 +40,21 @@ interface MenuDrawerProps {
   onOpenConhecaEsteLugar?: () => void;
   onOpenAboutApp?: () => void;
   onOpenWeather?: () => void;
+  onOpenVehicleModal?: () => void;
+  onOpenPhotoIncident?: () => void;
+  onOpenFutureTech?: () => void;
+  onOpenLayersModal?: () => void;
+  onOpenOfflineRegions?: () => void;
+  onOpenObservability?: () => void;
+  onOpenBrazilTouristMap?: () => void;
+  onOpenWazeLive?: () => void;
 }
 
 export const MenuDrawer: React.FC<MenuDrawerProps> = ({
   isOpen,
   onClose,
   user,
+  onOpenRoutePlanner,
   onOpenProfile,
   onOpenSafety,
   onOpenCulture,
@@ -55,6 +68,14 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
   onOpenConhecaEsteLugar,
   onOpenAboutApp,
   onOpenWeather,
+  onOpenVehicleModal,
+  onOpenPhotoIncident,
+  onOpenFutureTech,
+  onOpenLayersModal,
+  onOpenOfflineRegions,
+  onOpenObservability,
+  onOpenBrazilTouristMap,
+  onOpenWazeLive,
 }) => {
   if (!isOpen) return null;
 
@@ -116,6 +137,32 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
 
           {/* Menu Items List */}
           <div className="space-y-1.5 text-xs font-semibold text-slate-300">
+            {/* Waze ao Vivo Dedicated View */}
+            <button
+              onClick={() => { onOpenWazeLive?.(); onClose(); }}
+              className="w-full p-2.5 rounded-xl hover:bg-cyan-950/60 flex items-center gap-3 text-left transition-colors text-cyan-300 font-bold bg-gradient-to-r from-cyan-950/80 via-blue-950/40 to-slate-900 border border-cyan-400/50 shadow-sm"
+            >
+              <RouteIcon className="w-4 h-4 text-cyan-400" />
+              <span>🧭 Waze ao Vivo (Mapa & Trânsito Oficial)</span>
+            </button>
+
+            {/* Planejador de Rotas Principal */}
+            <button
+              onClick={() => { onOpenRoutePlanner?.(); onClose(); }}
+              className="w-full p-2.5 rounded-xl hover:bg-blue-900/40 flex items-center gap-3 text-left transition-colors text-cyan-300 font-bold bg-gradient-to-r from-blue-950/60 via-slate-900 to-slate-900 border border-cyan-500/40 shadow-sm"
+            >
+              <RouteIcon className="w-4 h-4 text-cyan-400" />
+              <span>🛣️ Traçar Rota & Destino (3 Modos)</span>
+            </button>
+
+            {/* Mercados & Pontos Turísticos do Brasil (Google Maps Clean) */}
+            <button
+              onClick={() => { onOpenBrazilTouristMap?.(); onClose(); }}
+              className="w-full p-2.5 rounded-xl hover:bg-amber-950/40 flex items-center gap-3 text-left transition-colors text-amber-300 font-bold bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-900 border border-amber-500/40 shadow-sm"
+            >
+              <Landmark className="w-4 h-4 text-amber-400" />
+              <span>🗺️ Mercados & Pontos Turísticos (Clean)</span>
+            </button>
             {/* 1. O Que Tem Aqui? (Varredura 500m / 2km) */}
             <button
               onClick={() => { onOpenOQueTemAqui?.(); onClose(); }}
@@ -179,6 +226,33 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
               <span>Alertas & Acontecendo na Via</span>
             </button>
 
+            {/* Cursus Vehicle Profile */}
+            <button
+              onClick={() => { onOpenVehicleModal?.(); onClose(); }}
+              className="w-full p-2.5 rounded-xl hover:bg-slate-900 flex items-center gap-3 text-left transition-colors text-amber-400 font-bold bg-amber-950/20 border border-amber-500/20"
+            >
+              <Car className="w-4 h-4 text-amber-400" />
+              <span>🚗 CURSUS VEHICLE & Combustível</span>
+            </button>
+
+            {/* IA de Ocorrências com Foto */}
+            <button
+              onClick={() => { onOpenPhotoIncident?.(); onClose(); }}
+              className="w-full p-2.5 rounded-xl hover:bg-slate-900 flex items-center gap-3 text-left transition-colors text-purple-300 font-bold bg-purple-950/20 border border-purple-500/20"
+            >
+              <AlertTriangle className="w-4 h-4 text-purple-400" />
+              <span>📸 IA de Ocorrências com Foto</span>
+            </button>
+
+            {/* Laboratório Tecnológico (AR, Dashcam, Mecânica 4.0) */}
+            <button
+              onClick={() => { onOpenFutureTech?.(); onClose(); }}
+              className="w-full p-2.5 rounded-xl hover:bg-slate-900 flex items-center gap-3 text-left transition-colors text-cyan-300 font-bold bg-cyan-950/20 border border-cyan-500/20"
+            >
+              <Radar className="w-4 h-4 text-cyan-400" />
+              <span>🧪 Lab Tecnológico (AR & Mecânica 4.0)</span>
+            </button>
+
             {/* 8. Comando por Voz */}
             <button
               onClick={() => { onOpenVoice(); onClose(); }}
@@ -186,6 +260,33 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
             >
               <Mic className="w-4 h-4 text-purple-400" />
               <span>Navegação & Comando de Voz</span>
+            </button>
+
+            {/* Camadas do Mapa */}
+            <button
+              onClick={() => { onOpenLayersModal?.(); onClose(); }}
+              className="w-full p-2.5 rounded-xl hover:bg-slate-900 flex items-center gap-3 text-left transition-colors text-sky-300 font-bold bg-sky-950/20 border border-sky-500/20"
+            >
+              <Radar className="w-4 h-4 text-sky-400" />
+              <span>🗺️ Camadas do Mapa (14 Camadas)</span>
+            </button>
+
+            {/* Mapas Offline & Download Regional */}
+            <button
+              onClick={() => { onOpenOfflineRegions?.(); onClose(); }}
+              className="w-full p-2.5 rounded-xl hover:bg-slate-900 flex items-center gap-3 text-left transition-colors text-teal-300 font-bold bg-teal-950/20 border border-teal-500/20"
+            >
+              <Download className="w-4 h-4 text-teal-400" />
+              <span>💾 Mapas Offline & Download Regional</span>
+            </button>
+
+            {/* Painel de Observabilidade */}
+            <button
+              onClick={() => { onOpenObservability?.(); onClose(); }}
+              className="w-full p-2.5 rounded-xl hover:bg-slate-900 flex items-center gap-3 text-left transition-colors text-purple-400 font-bold bg-purple-950/20 border border-purple-500/20"
+            >
+              <Activity className="w-4 h-4 text-purple-400" />
+              <span>📊 Painel de Observabilidade (Admin)</span>
             </button>
 
             {/* 9. Instalar Aplicativo (PWA) */}

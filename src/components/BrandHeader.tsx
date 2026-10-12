@@ -7,14 +7,15 @@ import {
   Camera, 
   Navigation2,
   MapPin,
-  Mic
+  Mic,
+  Route as RouteIcon
 } from 'lucide-react';
 import type { UserProfile, WeatherData } from '../types';
 
 interface BrandHeaderProps {
   user: UserProfile;
-  activePanel: 'map' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile';
-  setActivePanel: (panel: 'map' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile') => void;
+  activePanel: 'map' | 'waze' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile';
+  setActivePanel: (panel: 'map' | 'waze' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile') => void;
   openSafetyModal: () => void;
   openInstallModal: () => void;
   openVoiceModal: () => void;
@@ -22,6 +23,7 @@ interface BrandHeaderProps {
   openLocationModal?: () => void;
   openMenuDrawer?: () => void;
   openNotificationsModal?: () => void;
+  onOpenRoutePlanner?: () => void;
   onOpenTrafficOccurrences?: () => void;
   onOpenRadars?: () => void;
   activeOccurrencesCount: number;
@@ -33,12 +35,14 @@ interface BrandHeaderProps {
 
 export const BrandHeader: React.FC<BrandHeaderProps> = ({
   user,
+  activePanel,
   setActivePanel,
   openWeatherModal,
   openVoiceModal,
   openLocationModal,
   openMenuDrawer,
   openNotificationsModal,
+  onOpenRoutePlanner,
   onOpenTrafficOccurrences,
   onOpenRadars,
   activeOccurrencesCount,
@@ -102,8 +106,32 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
           </div>
         </div>
 
-        {/* Center / Right: Compact Non-Intrusive Quick Badges (Weather & Voice) */}
+        {/* Center / Right: Action items */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Waze ao Vivo Dedicated Area Toggle */}
+          <button
+            onClick={() => setActivePanel(activePanel === 'waze' ? 'map' : 'waze')}
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black shadow-md active:scale-95 transition-all border ${
+              activePanel === 'waze'
+                ? 'bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-400/30'
+                : 'bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border-cyan-500/40'
+            }`}
+            title="Abrir Waze ao Vivo (Mapa Oficial em Tempo Real)"
+          >
+            <Navigation2 className="w-3.5 h-3.5" />
+            <span>Waze ao Vivo</span>
+          </button>
+
+          {/* Prominent Direct "Rotas" Button in Header */}
+          <button
+            onClick={onOpenRoutePlanner}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:brightness-110 text-white text-xs font-black shadow-md shadow-blue-500/25 active:scale-95 transition-all"
+            title="Abrir Planejador de Rotas e Destino"
+          >
+            <RouteIcon className="w-3.5 h-3.5" />
+            <span>Rotas</span>
+          </button>
+
           {/* Compact Weather Pill */}
           <button
             onClick={openWeatherModal}

@@ -23,13 +23,14 @@ export const VoiceCommandModal: React.FC<VoiceCommandModalProps> = ({
   if (!isOpen) return null;
 
   const sampleCommands = [
-    { text: 'Ir para Avenida Paulista', icon: <MapPin className="w-3.5 h-3.5 text-lime-400" /> },
-    { text: 'Hospital mais próximo', icon: <Compass className="w-3.5 h-3.5 text-red-400" /> },
-    { text: 'Posto de gasolina', icon: <Compass className="w-3.5 h-3.5 text-amber-400" /> },
-    { text: 'Iniciar navegação', icon: <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> },
-    { text: 'Ocorrências na via', icon: <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> },
-    { text: 'Partida segura', icon: <ShieldCheck className="w-3.5 h-3.5 text-lime-400" /> },
-    { text: 'Centralizar mapa', icon: <Compass className="w-3.5 h-3.5 text-blue-400" /> },
+    { text: 'Cursus, me leve para casa', icon: <MapPin className="w-3.5 h-3.5 text-lime-400" /> },
+    { text: 'Cursus, qual é a melhor rota?', icon: <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> },
+    { text: 'Quero a rota mais segura', icon: <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> },
+    { text: 'Tem acidente no caminho?', icon: <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> },
+    { text: 'Vai chover?', icon: <Compass className="w-3.5 h-3.5 text-blue-400" /> },
+    { text: 'Procure um posto', icon: <Compass className="w-3.5 h-3.5 text-amber-400" /> },
+    { text: 'Procure um hospital', icon: <Compass className="w-3.5 h-3.5 text-red-400" /> },
+    { text: 'Cursus, evite pedágio', icon: <Sparkles className="w-3.5 h-3.5 text-purple-400" /> },
   ];
 
   return (

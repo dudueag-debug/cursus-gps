@@ -23,7 +23,8 @@ import {
   Sparkles,
   Info,
   Search,
-  CheckCircle2
+  CheckCircle2,
+  Landmark
 } from 'lucide-react';
 import type { Occurrence, Coordinates, PlaceCategory, WeatherData, TransportMode, RouteOption } from '../../types';
 
@@ -48,6 +49,7 @@ interface ViaCardHUDProps {
   onOpenOQueTemAqui?: () => void;
   onOpenConhecaEsteLugar?: () => void;
   onOpenAboutApp?: () => void;
+  onOpenBrazilTouristMap?: () => void;
 }
 
 export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
@@ -64,6 +66,7 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
   onOpenOQueTemAqui,
   onOpenConhecaEsteLugar,
   onOpenAboutApp,
+  onOpenBrazilTouristMap,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [reportSuccessToast, setReportSuccessToast] = useState<string | null>(null);
@@ -121,11 +124,11 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
         {/* ULTRA-COMPACT SLIM FLOATING HUD BAR (Single row, takes minimal space) */}
         <div className="px-3 py-2 flex items-center justify-between gap-2">
           
-          {/* Left: Quick Destination / ETA info */}
+          {/* Left: Quick Destination / ETA info (ALWAYS opens RoutePlanner on click) */}
           <div 
-            onClick={selectedRoute ? () => setIsExpanded(!isExpanded) : onOpenRoutePlanner}
+            onClick={onOpenRoutePlanner}
             className="flex items-center gap-2 cursor-pointer group shrink min-w-0"
-            title={selectedRoute ? 'Clique para ver detalhes' : 'Buscar Destino'}
+            title="Clique para abrir e calcular rotas"
           >
             {selectedRoute ? (
               <div className="flex flex-col text-left leading-tight truncate">
@@ -137,8 +140,8 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
                     ({distanceKm} km)
                   </span>
                 </div>
-                <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1 truncate">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <div className="text-[10px] text-cyan-300 font-medium flex items-center gap-1 truncate">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                   <span className="truncate">{selectedRoute.title || `Chegada às ${etaTime}`}</span>
                 </div>
               </div>
@@ -198,22 +201,29 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
             </button>
           </div>
 
-          {/* Right: Main Navigation Action Button & Drawer Toggle */}
-          <div className="flex items-center gap-1 shrink-0">
+          {/* Right: Actions for Routes & Navigation */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Always accessible Route Planner button */}
             <button
-              onClick={() => {
-                if (selectedRoute && onStartNavigation) {
-                  onStartNavigation();
-                } else if (onOpenRoutePlanner) {
-                  onOpenRoutePlanner();
-                }
-              }}
-              className="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:brightness-110 text-white text-xs font-bold active:scale-95 transition-all shadow-md shadow-cyan-500/25 flex items-center gap-1.5"
-              title={selectedRoute ? 'Iniciar Navegação GPS em Tempo Real' : 'Escolher Destino para Navegar'}
+              onClick={onOpenRoutePlanner}
+              className="px-2.5 py-1.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold active:scale-95 transition-all flex items-center gap-1 shadow-sm"
+              title="Abrir Planejador de Rotas e Destino"
             >
-              <Navigation className="w-3.5 h-3.5 fill-white" />
-              <span>{selectedRoute ? 'Navegar' : 'Rotas'}</span>
+              <RouteIcon className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Rotas</span>
             </button>
+
+            {/* Start Navigation if Route Selected */}
+            {selectedRoute && (
+              <button
+                onClick={onStartNavigation}
+                className="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-lime-400 to-emerald-500 hover:brightness-110 text-slate-950 text-xs font-black active:scale-95 transition-all shadow-md shadow-lime-500/20 flex items-center gap-1"
+                title="Iniciar Navegação GPS em Tempo Real"
+              >
+                <Navigation className="w-3.5 h-3.5 fill-slate-950" />
+                <span>Navegar</span>
+              </button>
+            )}
 
             <button
               onClick={() => setIsExpanded(!isExpanded)}
@@ -231,7 +241,15 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
           <div className="flex flex-col p-3 gap-3 max-h-[42vh] overflow-y-auto border-t border-slate-800/80 bg-slate-950/98 animate-in fade-in duration-200 scrollbar-thin">
             
             {/* Quick Discover Shortcuts */}
-            <div className="grid grid-cols-5 gap-1.5 text-center">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-center">
+              <button
+                onClick={() => { onOpenBrazilTouristMap?.(); setIsExpanded(false); }}
+                className="p-2 rounded-xl bg-gradient-to-tr from-amber-950/40 to-slate-900 hover:bg-slate-850 border border-amber-500/30 flex flex-col items-center justify-center active:scale-95 transition-all text-amber-300 col-span-3 sm:col-span-2"
+              >
+                <Landmark className="w-4 h-4 text-amber-400 mb-0.5" />
+                <span className="text-[10px] font-bold">🗺️ Mercados & Turismo (Clean)</span>
+              </button>
+
               <button
                 onClick={() => { onOpenOQueTemAqui?.(); setIsExpanded(false); }}
                 className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-cyan-300"
@@ -246,14 +264,6 @@ export const ViaCardHUD: React.FC<ViaCardHUDProps> = ({
               >
                 <CloudSun className="w-4 h-4 text-amber-400 mb-0.5" />
                 <span className="text-[9px] font-medium">Clima</span>
-              </button>
-
-              <button
-                onClick={() => { onFindNearest?.('transporte_infraestrutura'); setIsExpanded(false); }}
-                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 flex flex-col items-center justify-center active:scale-95 transition-all text-sky-300"
-              >
-                <Bus className="w-4 h-4 text-sky-400 mb-0.5" />
-                <span className="text-[9px] font-medium">Transporte</span>
               </button>
 
               <button

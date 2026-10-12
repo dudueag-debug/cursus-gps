@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrandHeader } from './components/BrandHeader';
 import { GPSMap } from './components/Map/GPSMap';
+import { WazeLiveMapView } from './components/Map/WazeLiveMapView';
 import { RoutePlanner } from './components/Navigation/RoutePlanner';
 import { TurnByTurnOverlay } from './components/Navigation/TurnByTurnOverlay';
 import { CentralDeLocais } from './components/Panels/CentralDeLocais';
@@ -21,6 +22,15 @@ import { MenuDrawer } from './components/Panels/MenuDrawer';
 import { OQueTemAquiModal } from './components/Panels/OQueTemAquiModal';
 import { ConhecaEsteLugarModal } from './components/Panels/ConhecaEsteLugarModal';
 import { AboutAppModal } from './components/Panels/AboutAppModal';
+import { PhotoIncidentModal } from './components/Panels/PhotoIncidentModal';
+import { CursusVehicleModal } from './components/Panels/CursusVehicleModal';
+import { FutureTechModal } from './components/Panels/FutureTechModal';
+import { LayerControlModal, type DetailedLayerPreferences } from './components/Panels/LayerControlModal';
+import { OfflineRegionsModal } from './components/Panels/OfflineRegionsModal';
+import { ObservabilityDashboardModal } from './components/Panels/ObservabilityDashboardModal';
+import { BrazilTouristMapModal } from './components/Panels/BrazilTouristMapModal';
+import type { BrazilTouristSpot } from './data/brazilTouristCatalog';
+import { AIPredictionEngine, type RerouteOpportunity } from './engines/aiPredictionEngine';
 import { useVoiceCommander } from './hooks/useVoiceCommander';
 import type { UserProfile, Coordinates, RouteOption, Occurrence, CultureSpot, Place, PlaceCategory, WeatherData } from './types';
 import { api } from './services/api';
@@ -28,6 +38,12 @@ import { locationService } from './services/locationService';
 import { userService } from './services/userService';
 import { weatherService } from './services/weatherService';
 import { parseNaturalLanguageQuery } from './services/intelligentSearchService';
+import { CursusIntelligenceEngine, type VehicleProfileSpec } from './services/intelligenceEngine';
+import { gpsEngine } from './services/gpsEngine';
+import { MapMatchingService } from './services/mapMatchingService';
+import { supabaseService } from './services/supabaseClient';
+import { CursusCopilotService } from './services/copilotService';
+import { WifiOff, AlertTriangle } from 'lucide-react';
 
 export function App() {
   // Splash Screen State
@@ -71,7 +87,9 @@ export function App() {
   });
 
   // Active Navigation & View State
-  const [activePanel, setActivePanel] = useState<'map' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile'>('map');
+  const [activePanel, setActivePanel] = useState<'map' | 'waze' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile'>('map');
+  const [wazeTargetCoords, setWazeTargetCoords] = useState<Coordinates | null>(null);
+  const [wazeTargetLabel, setWazeTargetLabel] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
 
   // Geographic Coordinates (Real GPS or Cached Coordinates)
@@ -113,7 +131,52 @@ export function App() {
   const [isOQueTemAquiOpen, setIsOQueTemAquiOpen] = useState(false);
   const [isConhecaEsteLugarOpen, setIsConhecaEsteLugarOpen] = useState(false);
   const [isAboutAppOpen, setIsAboutAppOpen] = useState(false);
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+  const [isPhotoIncidentModalOpen, setIsPhotoIncidentModalOpen] = useState(false);
+  const [isFutureTechModalOpen, setIsFutureTechModalOpen] = useState(false);
+  const [isLayersModalOpen, setIsLayersModalOpen] = useState(false);
+  const [isOfflineRegionsModalOpen, setIsOfflineRegionsModalOpen] = useState(false);
+  const [isObservabilityModalOpen, setIsObservabilityModalOpen] = useState(false);
+  const [isBrazilTouristMapOpen, setIsBrazilTouristMapOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // 14 Detailed Layer Preferences
+  const [layerPreferences, setLayerPreferences] = useState<DetailedLayerPreferences>({
+    baseLayer: user.mapLayerType || 'streets',
+    traffic: true,
+    incidents: true,
+    weather: true,
+    transit: true,
+    bikeLanes: false,
+    parking: true,
+    fuelStations: true,
+    hospitals: true,
+    restaurants: false,
+    workshops: true,
+    tourism: false,
+  });
+
+  // Cursus Vehicle Profile Specification
+  const [vehicleSpec, setVehicleSpec] = useState<VehicleProfileSpec>({
+    type: 'car',
+    brand: 'Sedan Confort',
+    model: 'Cursus Precision',
+    fuelType: 'gasolina',
+    consumptionKmL: 12.0,
+  });
+
+  // Navigation Live Telemetry & Map Matching States
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [liveSpeedKmh, setLiveSpeedKmh] = useState(0);
+  const [currentStreetName, setCurrentStreetName] = useState('Via Principal');
+  const [remainingDistanceMeters, setRemainingDistanceMeters] = useState<number | undefined>(undefined);
+  const [rerouteOpportunity, setRerouteOpportunity] = useState<RerouteOpportunity | null>(null);
+
+  // Realtime Notification Toast (Supabase Realtime)
+  const [realtimeToast, setRealtimeToast] = useState<{ message: string; visible: boolean } | null>(null);
+
+  // Offline Connection Monitor (Rule of Truth)
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   // Toggle vehicle mode (Car <-> Motorcycle)
   const handleToggleTransportMode = () => {
@@ -407,8 +470,27 @@ export function App() {
 
     loadData();
 
+    // Network connectivity listeners
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Supabase Realtime Spatial Listener
+    const unsubscribeRealtime = supabaseService.subscribeToIncidents(currentLocation, event => {
+      setRealtimeToast({
+        message: `⚠️ Novo incidente reportado a ${event.distanceMeters || 700}m: ${event.incident.title}`,
+        visible: true,
+      });
+      setTimeout(() => setRealtimeToast(null), 6000);
+      refreshOccurrences();
+    });
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      unsubscribeRealtime();
       if (handleOrientation) {
         window.removeEventListener('deviceorientation', handleOrientation);
       }
@@ -420,11 +502,101 @@ export function App() {
 
   const selectedRoute = routes[selectedRouteIndex] || null;
 
-  // Handle route calculation
+  // Active Map Matching and Off-Route Detection during Navigation
+  useEffect(() => {
+    if (!isNavigating || !selectedRoute) return;
+
+    const match = MapMatchingService.matchPosition(currentLocation, selectedRoute);
+    if (match.streetName) setCurrentStreetName(match.streetName);
+    setRemainingDistanceMeters(match.remainingDistanceMeters);
+
+    if (match.needsRecalculation && !isRecalculating) {
+      handleOffRouteRecalculate();
+    }
+  }, [currentLocation, isNavigating, selectedRoute]);
+
+  // Periodic Smart Rerouting Evaluation during Navigation (Section 9)
+  useEffect(() => {
+    if (!isNavigating || !selectedRoute) {
+      setRerouteOpportunity(null);
+      return;
+    }
+
+    const checkReroute = () => {
+      const candidates = routes.filter((_, idx) => idx !== selectedRouteIndex);
+      const opportunity = AIPredictionEngine.evaluateSmartRerouting(selectedRoute, candidates);
+      if (opportunity) {
+        setRerouteOpportunity(opportunity);
+        speakText(`Nova rota mais rápida encontrada! Economize ${opportunity.timeSavedMinutes} minutos.`);
+      }
+    };
+
+    const interval = setInterval(checkReroute, 30000);
+    // Initial check after 5s
+    const timeout = setTimeout(checkReroute, 5000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [isNavigating, selectedRoute, routes, selectedRouteIndex]);
+
+  const handleAcceptReroute = (newRoute: RouteOption) => {
+    const newIdx = routes.findIndex(r => r.id === newRoute.id);
+    if (newIdx !== -1) {
+      setSelectedRouteIndex(newIdx);
+    } else {
+      setRoutes(prev => [newRoute, ...prev]);
+      setSelectedRouteIndex(0);
+    }
+    const saved = rerouteOpportunity?.timeSavedMinutes || 5;
+    setRerouteOpportunity(null);
+    speakText(`Rota atualizada! Economia estimada de ${saved} minutos.`);
+  };
+
+  const handleDismissReroute = () => {
+    setRerouteOpportunity(null);
+  };
+
+  // Intelligent Off-Route Auto-Recalculation (Section 8)
+  const handleOffRouteRecalculate = async () => {
+    if (!selectedRoute || isRecalculating) return;
+    setIsRecalculating(true);
+    try {
+      const destCoords = selectedRoute.coordinates[selectedRoute.coordinates.length - 1];
+      const data = await api.calculateRoute(currentLocation, destCoords, user.preferredMode);
+      const recommendation = CursusIntelligenceEngine.analyzeAndRecommendRoutes(data.routes, occurrences, weatherData, vehicleSpec);
+      setRoutes(recommendation.routes);
+      setSelectedRouteIndex(0);
+      MapMatchingService.resetOffRouteCounter();
+      speakText('Recalculando rota...');
+    } catch (err) {
+      console.warn('Recalculate notice:', err);
+    } finally {
+      setTimeout(() => setIsRecalculating(false), 1200);
+    }
+  };
+
+  // Handle route calculation with Cursus Intelligence Engine (3 Modes)
   const handleRouteCalculated = (newRoutes: RouteOption[], selectedIdx: number = 0) => {
-    setRoutes(newRoutes);
-    setSelectedRouteIndex(selectedIdx);
-    setActivePanel('map');
+    try {
+      const recommendation = CursusIntelligenceEngine.analyzeAndRecommendRoutes(
+        newRoutes,
+        occurrences,
+        weatherData,
+        vehicleSpec
+      );
+      setRoutes(recommendation.routes);
+      setSelectedRouteIndex(selectedIdx);
+      setActivePanel('map');
+      if (recommendation.explanation) {
+        speakText(recommendation.explanation);
+      }
+    } catch (err) {
+      setRoutes(newRoutes);
+      setSelectedRouteIndex(selectedIdx);
+      setActivePanel('map');
+    }
   };
 
   // Trigger Navigation Start
@@ -450,7 +622,7 @@ export function App() {
   };
 
   const handleProceedFromSafety = () => {
-    if (selectedRoute) {
+    if (selectedRoute && !isNavigating) {
       userService.addRouteToUserHistory(
         user.id,
         detectedLocationName || 'Minha Localização',
@@ -465,20 +637,60 @@ export function App() {
 
   const handleExitNavigation = () => {
     setIsNavigating(false);
-    speakText('Navegação finalizada.');
+    setIsRecalculating(false);
+    speakText('Navegação encerrada.');
+  };
+
+  // Save Occurrence from Photo AI Modal (Section 11)
+  const handleSavePhotoOccurrence = async (data: {
+    category: string;
+    title: string;
+    description: string;
+    locationName: string;
+    coordinates: Coordinates;
+    severity: string;
+    photoUrl?: string;
+    isAiValidated?: boolean;
+    aiConfidencePercent?: number;
+  }) => {
+    const newOcc = await api.reportOccurrence(data);
+    supabaseService.broadcastIncident(newOcc);
+    refreshOccurrences();
+    speakText('Ocorrência validada pela IA e publicada no mapa!');
   };
 
   // Traçar rota a partir de um local encontrado
   const handleRouteToPlace = async (place: Place) => {
     try {
       const data = await api.calculateRoute(currentLocation, place.coordinates, user.preferredMode);
-      setRoutes(data.routes);
-      setSelectedRouteIndex(0);
-      setActivePanel('map');
+      handleRouteCalculated(data.routes, 0);
       speakText(`Traçando rota até ${place.name}`);
     } catch (e) {
       console.error(e);
       alert('Não foi possível calcular a rota até este local no momento.');
+    }
+  };
+
+  // Traçar rota para Mercado / Ponto Turístico do Brasil
+  const handleNavigateToTouristSpot = async (spot: BrazilTouristSpot) => {
+    try {
+      const data = await api.calculateRoute(currentLocation, spot.coordinates, user.preferredMode);
+      handleRouteCalculated(data.routes, 0);
+      speakText(`Traçando rota para ${spot.name} em ${spot.city}`);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Traçar rota com 1 clique em qualquer ponto do mapa
+  const handleMapClick = async (coords: Coordinates) => {
+    if (isNavigating) return;
+    try {
+      const data = await api.calculateRoute(currentLocation, coords, user.preferredMode);
+      handleRouteCalculated(data.routes, 0);
+      speakText('Rota traçada para o ponto selecionado no mapa.');
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -549,6 +761,10 @@ export function App() {
         openLocationModal={() => setIsLocationModalOpen(true)}
         openMenuDrawer={() => setIsMenuDrawerOpen(true)}
         openNotificationsModal={() => setActivePanel('occurrences')}
+        onOpenRoutePlanner={() => {
+          setActivePanel('map');
+          setIsMobilePlannerOpen(true);
+        }}
         onOpenTrafficOccurrences={() => setActivePanel('occurrences')}
         onOpenRadars={() => setActivePanel('occurrences')}
         weatherData={weatherData}
@@ -562,7 +778,32 @@ export function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 relative flex flex-col lg:flex-row overflow-hidden">
-        {/* Map Area */}
+        {activePanel === 'waze' ? (
+          <div className="flex-1 relative h-full w-full min-h-0 flex flex-col">
+            <WazeLiveMapView
+              userCoords={currentLocation}
+              detectedLocationName={detectedLocationName}
+              gpsAccuracy={gpsAccuracy}
+              selectedRoute={selectedRoute}
+              places={places}
+              initialTargetCoords={wazeTargetCoords}
+              initialTargetLabel={wazeTargetLabel}
+              onBackToCursusMap={() => setActivePanel('map')}
+              onTraceInCursus={async (destCoords, destLabel) => {
+                try {
+                  const data = await api.calculateRoute(currentLocation, destCoords, user.preferredMode);
+                  handleRouteCalculated(data.routes, 0);
+                  setActivePanel('map');
+                  speakText(`Calculando 3 rotas inteligentes no Cursus GPS para ${destLabel}`);
+                } catch (e) {
+                  console.error(e);
+                  setActivePanel('map');
+                }
+              }}
+            />
+          </div>
+        ) : (
+        /* Map Area */
         <div className="flex-1 relative h-full w-full min-h-0">
           <GPSMap
             currentLocation={currentLocation}
@@ -572,13 +813,21 @@ export function App() {
             selectedRoute={selectedRoute}
             occurrences={occurrences}
             cultureSpots={cultureSpots}
+            places={places}
             onSelectOccurrence={handleSelectOccurrence}
             onSelectCultureSpot={handleSelectCultureSpot}
+            onSelectPlace={handleRouteToPlace}
+            onMapClick={handleMapClick}
             onOpenWeather={() => setIsWeatherModalOpen(true)}
             onOpenSocorro={() => setIsSocorroModalOpen(true)}
             onOpenOccurrences={() => setActivePanel('occurrences')}
             onFindCategory={handleFindNearest}
             onOpenPlacesPanel={() => setActivePanel('places')}
+            onOpenWazeLive={(coords, label) => {
+              if (coords) setWazeTargetCoords(coords);
+              if (label) setWazeTargetLabel(label);
+              setActivePanel('waze');
+            }}
             onUpdateLocation={(coords) => {
               locationService.reverseGeocode(coords).then(rev => {
                 handleLocationSelected(coords, `${rev.city} - ${rev.state} • GPS Ao Vivo`);
@@ -613,6 +862,7 @@ export function App() {
               onOpenOQueTemAqui={() => setIsOQueTemAquiOpen(true)}
               onOpenConhecaEsteLugar={() => setIsConhecaEsteLugarOpen(true)}
               onOpenAboutApp={() => setIsAboutAppOpen(true)}
+              onOpenBrazilTouristMap={() => setIsBrazilTouristMapOpen(true)}
             />
           )}
 
@@ -622,9 +872,43 @@ export function App() {
               route={selectedRoute}
               onExitNavigation={handleExitNavigation}
               enableVoice={user.enableVoiceInstructions}
+              isRecalculating={isRecalculating}
+              liveSpeedKmh={liveSpeedKmh}
+              remainingDistanceMeters={remainingDistanceMeters}
+              currentStreetName={currentStreetName}
+              rerouteOpportunity={rerouteOpportunity}
+              onAcceptReroute={handleAcceptReroute}
+              onDismissReroute={handleDismissReroute}
+              isDeadReckoning={MapMatchingService.isTunnelWay(currentStreetName)}
+              providerName={selectedRoute.dataOrigin === 'real' ? 'Cartografia Viva OSRM/OpenStreetMap Brasil' : 'Motor Geométrico Resiliente Cursus'}
             />
           )}
+
+          {/* Realtime Spatial Notification Toast */}
+          {realtimeToast && realtimeToast.visible && (
+            <div className="absolute top-16 left-4 right-4 z-40 max-w-md mx-auto bg-amber-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl shadow-2xl border border-amber-400 flex items-center justify-between gap-2 animate-bounce">
+              <div className="flex items-center gap-2 text-xs">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-slate-950" />
+                <span>{realtimeToast.message}</span>
+              </div>
+              <button
+                onClick={() => setRealtimeToast(null)}
+                className="text-xs px-2 py-0.5 rounded bg-slate-950/20 hover:bg-slate-950/40 text-slate-950 font-black"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Offline Mode Banner (Rule of Truth) */}
+          {!isOnline && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-red-600 text-white font-extrabold text-[11px] px-3.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 border border-red-400 uppercase tracking-wider animate-pulse">
+              <WifiOff className="w-3.5 h-3.5" />
+              <span>MODO OFFLINE ATIVO</span>
+            </div>
+          )}
         </div>
+        )}
 
         {/* Mobile Route Planner Drawer */}
         {!isNavigating && isMobilePlannerOpen && (
@@ -647,7 +931,6 @@ export function App() {
                 selectedRoute={selectedRoute}
                 onRouteCalculated={(newRoutes, idx) => {
                   handleRouteCalculated(newRoutes, idx);
-                  setIsMobilePlannerOpen(false);
                 }}
                 onSelectAlternative={idx => setSelectedRouteIndex(idx)}
                 onStartNavigation={() => {
@@ -658,13 +941,19 @@ export function App() {
                   setIsVoiceModalOpen(true);
                   voice.startListening();
                 }}
+                onOpenInWazeLive={(coords, label) => {
+                  setWazeTargetCoords(coords);
+                  setWazeTargetLabel(label);
+                  setIsMobilePlannerOpen(false);
+                  setActivePanel('waze');
+                }}
               />
             </div>
           </div>
         )}
 
         {/* Side / Drawer Panel depending on active tab */}
-        {!isNavigating && activePanel !== 'map' && (
+        {!isNavigating && activePanel !== 'map' && activePanel !== 'waze' && (
           <div className="absolute inset-x-0 bottom-0 top-[52px] lg:static lg:top-auto lg:bottom-auto w-full lg:w-[460px] xl:w-[500px] bg-slate-950/98 border-t lg:border-t-0 lg:border-l border-slate-800 p-3 sm:p-4 overflow-y-auto max-h-full shadow-2xl z-40 flex flex-col">
             {/* Mobile close bar */}
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 lg:hidden shrink-0">
@@ -684,6 +973,14 @@ export function App() {
                 <CentralDeLocais
                   onRouteToPlace={handleRouteToPlace}
                   userCoords={currentLocation}
+                  onPlacesUpdated={(updatedPlaces) => {
+                    setPlaces(updatedPlaces);
+                  }}
+                  onSelectPlaceOnMap={(place) => {
+                    setPlaces([place]);
+                    setCurrentLocation(place.coordinates);
+                    setActivePanel('map');
+                  }}
                 />
               )}
 
@@ -713,6 +1010,11 @@ export function App() {
               onTriggerVoice={() => {
                 setIsVoiceModalOpen(true);
                 voice.startListening();
+              }}
+              onOpenInWazeLive={(coords, label) => {
+                setWazeTargetCoords(coords);
+                setWazeTargetLabel(label);
+                setActivePanel('waze');
               }}
             />
           </div>
@@ -820,6 +1122,35 @@ export function App() {
         onSelectLocation={handleLocationSelected}
       />
 
+      {/* IA de Ocorrências com Foto */}
+      <PhotoIncidentModal
+        isOpen={isPhotoIncidentModalOpen}
+        onClose={() => setIsPhotoIncidentModalOpen(false)}
+        currentLocation={currentLocation}
+        detectedLocationName={detectedLocationName}
+        onSaveOccurrence={handleSavePhotoOccurrence}
+      />
+
+      {/* CURSUS VEHICLE Modal */}
+      <CursusVehicleModal
+        isOpen={isVehicleModalOpen}
+        onClose={() => setIsVehicleModalOpen(false)}
+        user={user}
+        vehicleSpec={vehicleSpec}
+        onSaveVehicleSpec={spec => {
+          setVehicleSpec(spec);
+          if (routes.length > 0) {
+            handleRouteCalculated(routes, selectedRouteIndex);
+          }
+        }}
+      />
+
+      {/* Laboratório Tecnológico Modal */}
+      <FutureTechModal
+        isOpen={isFutureTechModalOpen}
+        onClose={() => setIsFutureTechModalOpen(false)}
+      />
+
       <VoiceCommandModal
         isOpen={isVoiceModalOpen}
         onClose={() => {
@@ -834,7 +1165,32 @@ export function App() {
           else voice.startListening();
         }}
         onExecuteSampleCommand={phrase => {
-          voice.processCommand(phrase);
+          const copilotRes = CursusCopilotService.processCommand(phrase, {
+            currentLocation,
+            activeRoute: selectedRoute,
+            candidateRoutes: routes,
+            occurrences,
+            weather: weatherData,
+          });
+
+          speakText(copilotRes.spokenResponse);
+
+          if (copilotRes.action === 'navigate_home') {
+            handleQuickDestination('home');
+          } else if (copilotRes.action === 'navigate_work') {
+            handleQuickDestination('work');
+          } else if (copilotRes.action === 'find_poi' && copilotRes.categoryToSearch) {
+            handleFindNearest(copilotRes.categoryToSearch as any);
+          } else if (copilotRes.action === 'select_route_mode' && copilotRes.targetMode) {
+            const idx = routes.findIndex(r => r.routeCategory === copilotRes.targetMode);
+            if (idx !== -1) setSelectedRouteIndex(idx);
+          } else if (copilotRes.action === 'weather_query') {
+            setIsWeatherModalOpen(true);
+          } else if (copilotRes.action === 'incident_query') {
+            setActivePanel('occurrences');
+          }
+
+          setIsVoiceModalOpen(false);
         }}
       />
 
@@ -843,6 +1199,10 @@ export function App() {
         isOpen={isMenuDrawerOpen}
         onClose={() => setIsMenuDrawerOpen(false)}
         user={user}
+        onOpenRoutePlanner={() => {
+          setActivePanel('map');
+          setIsMobilePlannerOpen(true);
+        }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         onOpenSafety={() => setIsSafetyModalOpen(true)}
         onOpenCulture={() => setIsCultureModalOpen(true)}
@@ -859,6 +1219,45 @@ export function App() {
         onOpenConhecaEsteLugar={() => setIsConhecaEsteLugarOpen(true)}
         onOpenAboutApp={() => setIsAboutAppOpen(true)}
         onOpenWeather={() => setIsWeatherModalOpen(true)}
+        onOpenVehicleModal={() => setIsVehicleModalOpen(true)}
+        onOpenPhotoIncident={() => setIsPhotoIncidentModalOpen(true)}
+        onOpenFutureTech={() => setIsFutureTechModalOpen(true)}
+        onOpenLayersModal={() => setIsLayersModalOpen(true)}
+        onOpenOfflineRegions={() => setIsOfflineRegionsModalOpen(true)}
+        onOpenObservability={() => setIsObservabilityModalOpen(true)}
+        onOpenBrazilTouristMap={() => setIsBrazilTouristMapOpen(true)}
+        onOpenWazeLive={() => setActivePanel('waze')}
+      />
+
+      {/* Camadas do Mapa (14 Camadas) Modal */}
+      <LayerControlModal
+        isOpen={isLayersModalOpen}
+        onClose={() => setIsLayersModalOpen(false)}
+        preferences={layerPreferences}
+        onUpdatePreferences={pref => {
+          setLayerPreferences(pref);
+          setUser(prev => ({ ...prev, mapLayerType: pref.baseLayer }));
+        }}
+      />
+
+      {/* Mapas Offline & Download Regional Modal */}
+      <OfflineRegionsModal
+        isOpen={isOfflineRegionsModalOpen}
+        onClose={() => setIsOfflineRegionsModalOpen(false)}
+      />
+
+      {/* Painel de Observabilidade & Diagnósticos Modal */}
+      <ObservabilityDashboardModal
+        isOpen={isObservabilityModalOpen}
+        onClose={() => setIsObservabilityModalOpen(false)}
+      />
+
+      {/* Mercados & Pontos Turísticos do Brasil (Google Maps Clean Style) Modal */}
+      <BrazilTouristMapModal
+        isOpen={isBrazilTouristMapOpen}
+        onClose={() => setIsBrazilTouristMapOpen(false)}
+        userCoords={currentLocation}
+        onNavigateToSpot={handleNavigateToTouristSpot}
       />
     </div>
   );
