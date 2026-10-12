@@ -217,13 +217,13 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
               <span>Central de Locais & Serviços</span>
             </button>
 
-            {/* 7. Alertas & Acontecendo na Via */}
+            {/* 7. Fica Atento Tô Passando */}
             <button
               onClick={() => { onOpenOccurrences(); onClose(); }}
               className="w-full p-2.5 rounded-xl hover:bg-slate-900 flex items-center gap-3 text-left transition-colors"
             >
               <AlertTriangle className="w-4 h-4 text-amber-400" />
-              <span>Alertas & Acontecendo na Via</span>
+              <span>👮📸 Fica Atento Tô Passando</span>
             </button>
 
             {/* Cursus Vehicle Profile */}

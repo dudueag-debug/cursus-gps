@@ -442,7 +442,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         <div class="text-xs p-1.5 font-semibold max-w-[220px]">
           <div class="font-black text-slate-900">${badgeEmoji} ${occ.title}</div>
           <div class="text-[10px] text-slate-700 mt-0.5">${occ.description || ''}</div>
-          <div class="text-[10px] text-cyan-800 font-bold mt-1">${isResolved ? '✅ Normalizada' : '🔴 Ativa no Tô Passando'} • 👍 ${occ.confirmationsCount} confirmações</div>
+          <div class="text-[10px] text-cyan-800 font-bold mt-1">${isResolved ? '✅ Normalizada' : '🔴 Fica Atento Tô Passando'} • 👍 ${occ.confirmationsCount} confirmações</div>
         </div>
       `, { direction: 'top', offset: [0, -14] });
 
@@ -694,7 +694,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 onClick={onOpenOccurrences}
                 className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-slate-950/90 hover:bg-slate-900 text-amber-300 font-black text-[11px] shadow-xl border border-amber-500/40 active:scale-95 transition-all"
               >
-                <span>👮📸 Alertas na Via ({occurrences.length})</span>
+                <span>👮📸 Fica Atento Tô Passando ({occurrences.length})</span>
               </button>
             )}
 

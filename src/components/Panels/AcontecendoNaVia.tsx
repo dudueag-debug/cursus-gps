@@ -130,10 +130,10 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-6 h-6 text-amber-400" />
-            <h2 className="text-lg font-black tracking-tight text-white">Acontecendo na Via</h2>
+            <h2 className="text-lg font-black tracking-tight text-white">Fica Atento Tô Passando</h2>
           </div>
           <p className="text-xs text-slate-400">
-            Alertas em tempo real: obras, acidentes, buracos, alagamentos e condições de tráfego validadas.
+            Fica Atento Tô Passando em tempo real: polícia, radar, obras, acidentes, buracos, alagamentos e tráfego validado.
           </p>
         </div>
 
@@ -150,7 +150,7 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
       <div className="bg-blue-950/40 border border-blue-800/60 rounded-xl p-3 flex items-start gap-2.5 text-xs text-slate-300">
         <ShieldCheck className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
         <div>
-          <p className="font-semibold text-white">Algoritmo de Normalização Automática do CURSUS</p>
+          <p className="font-semibold text-white">Algoritmo de Normalização Automática • Fica Atento Tô Passando</p>
           <p className="text-slate-400 text-[11px] mt-0.5">
             Diferenciamos com transparência dados de órgãos oficiais de relatos comunitários. Quando os condutores confirmam que a pista foi liberada, o sistema normaliza a via automaticamente.
           </p>
