@@ -389,6 +389,9 @@ export function App() {
               if (pos.coords.accuracy) {
                 setGpsAccuracy(Math.round(pos.coords.accuracy));
               }
+              if (pos.coords.speed !== null && !isNaN(pos.coords.speed) && pos.coords.speed >= 0) {
+                setLiveSpeedKmh(Math.round(pos.coords.speed * 3.6));
+              }
               if (
                 pos.coords.heading !== null &&
                 !isNaN(pos.coords.heading) &&
@@ -795,6 +798,8 @@ export function App() {
             occurrences={occurrences}
             cultureSpots={cultureSpots}
             places={places}
+            gpsAccuracy={gpsAccuracy}
+            liveSpeedKmh={liveSpeedKmh}
             onSelectOccurrence={handleSelectOccurrence}
             onSelectCultureSpot={handleSelectCultureSpot}
             onSelectPlace={handleRouteToPlace}

@@ -28,6 +28,14 @@ interface GPSMapProps {
   onOpenWazeLive?: (coords?: Coordinates, label?: string) => void;
   isSplashActive?: boolean;
   activePanel?: string;
+  gpsAccuracy?: number | null;
+  liveSpeedKmh?: number;
+}
+
+function getCardinalDirection(angle: number): string {
+  const directions = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
+  const index = Math.round((angle % 360) / 45) % 8;
+  return directions[index];
 }
 
 const MAP_QUICK_CATEGORIES = [
@@ -79,14 +87,18 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   onOpenPlacesPanel,
   isSplashActive = false,
   activePanel = 'map',
+  gpsAccuracy = 3,
+  liveSpeedKmh,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const vehicleMarkerRef = useRef<L.Marker | null>(null);
+  const accuracyCircleRef = useRef<L.Circle | null>(null);
   const primaryRouteLineRef = useRef<L.Polyline | null>(null);
   const altRouteLineRef = useRef<L.Polyline | null>(null);
   const destMarkerRef = useRef<L.Marker | null>(null);
+  const destBeaconCircleRef = useRef<L.Circle | null>(null);
   const occurrencesLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const cultureLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const placesLayerGroupRef = useRef<L.LayerGroup | null>(null);
@@ -117,6 +129,36 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   const [activeRiskZone, setActiveRiskZone] = useState<Occurrence | null>(null);
   const [zoneSecondsElapsed, setZoneSecondsElapsed] = useState<number>(0);
   const [zoneDismissedId, setZoneDismissedId] = useState<string | null>(null);
+  const lastWarnedRadarIdRef = useRef<string | null>(null);
+
+  // Proximity Radar / Pardal tracking (< 450m)
+  const nearbyRadar = occurrences.find(o =>
+    (o.category === 'radar' || o.title.toLowerCase().includes('radar') || o.title.toLowerCase().includes('pardal')) &&
+    calcDistanceMeters(currentLocation, o.coordinates) <= 450
+  );
+
+  const radarDistance = nearbyRadar ? Math.round(calcDistanceMeters(currentLocation, nearbyRadar.coordinates)) : 0;
+  const currentSpeed = liveSpeedKmh && liveSpeedKmh > 0 ? liveSpeedKmh : (isNavigating ? 48 : 0);
+  const radarSpeedLimit = nearbyRadar?.speedLimitKmh || 60;
+  const isOverSpeed = nearbyRadar ? currentSpeed > radarSpeedLimit : false;
+
+  // Spoken voice advisory when entering radar proximity
+  useEffect(() => {
+    if (nearbyRadar && nearbyRadar.id !== lastWarnedRadarIdRef.current) {
+      lastWarnedRadarIdRef.current = nearbyRadar.id;
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window && user.enableVoiceInstructions) {
+        try {
+          window.speechSynthesis.cancel();
+          const dist = Math.round(calcDistanceMeters(currentLocation, nearbyRadar.coordinates));
+          const limit = nearbyRadar.speedLimitKmh || 60;
+          const msg = new SpeechSynthesisUtterance(`Atenção: radar à frente a ${dist} metros. Limite regulamentar ${limit} quilômetros por hora.`);
+          msg.lang = 'pt-BR';
+          msg.rate = 1.05;
+          window.speechSynthesis.speak(msg);
+        } catch {}
+      }
+    }
+  }, [nearbyRadar?.id, user.enableVoiceInstructions]);
 
   // Professional Watermark-Free Layer Definitions for Brazil & Worldwide (Zero Waze dependencies)
   const getLayerConfig = (layer: MapLayerType) => {
@@ -160,8 +202,10 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       attribution: config.attribution,
       className: config.className,
       crossOrigin: true,
-      keepBuffer: 8,
+      keepBuffer: 10,
       updateWhenIdle: false,
+      detectRetina: true,
+      subdomains: 'abcd',
     });
 
     // Fallback on tile error to standard OSM
@@ -279,6 +323,9 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       const baseTile = createSafeTile(activeLayer).addTo(map);
       tileLayerRef.current = baseTile;
 
+      // Professional Navigation Metric Scale Control (dynamic physical distance)
+      L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
+
       // Occurrences, Culture & Places layer groups
       const occGroup = L.layerGroup().addTo(map);
       const culGroup = L.layerGroup().addTo(map);
@@ -394,7 +441,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     mapRef.current.panTo([currentLocation.lat, currentLocation.lng], { animate: true, duration: 1.2 });
   }, [currentLocation.lat, currentLocation.lng]);
 
-  // Update Vehicle Marker Position, Icon, and Heading
+  // Update Vehicle Marker Position, Icon, GPS Accuracy Pulse Ring, and Heading
   useEffect(() => {
     if (!vehicleMarkerRef.current || !mapRef.current) return;
 
@@ -409,12 +456,32 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     );
     vehicleMarkerRef.current.setIcon(newIcon);
 
-    if (isNavigating) {
-      mapRef.current.panTo([currentLocation.lat, currentLocation.lng], { animate: true });
+    // RTK Satellite Accuracy Ring showing precision
+    const accuracyRadius = Math.max(10, Math.min(45, gpsAccuracy || 18));
+    if (!accuracyCircleRef.current) {
+      accuracyCircleRef.current = L.circle([currentLocation.lat, currentLocation.lng], {
+        radius: accuracyRadius,
+        color: '#06b6d4',
+        fillColor: '#22d3ee',
+        fillOpacity: 0.12,
+        weight: 1.5,
+        dashArray: '3, 4',
+      }).addTo(mapRef.current);
+    } else {
+      accuracyCircleRef.current.setLatLng([currentLocation.lat, currentLocation.lng]);
+      accuracyCircleRef.current.setRadius(accuracyRadius);
     }
-  }, [currentLocation, heading, user.vehicleModel, user.vehicleColor, user.enableWindEffect, isNavigating]);
 
-  // Draw Routes (Waze-Style Dual Polyline & Destination Pin)
+    if (isNavigating) {
+      // Forward perspective camera offset so driver sees upcoming roads and intersections
+      const rad = (heading * Math.PI) / 180;
+      const forwardLat = Math.cos(rad) * 0.0016;
+      const forwardLng = Math.sin(rad) * 0.0016;
+      mapRef.current.panTo([currentLocation.lat + forwardLat, currentLocation.lng + forwardLng], { animate: true, duration: 0.8 });
+    }
+  }, [currentLocation, heading, user.vehicleModel, user.vehicleColor, user.enableWindEffect, isNavigating, gpsAccuracy]);
+
+  // Draw Professional Technological Laser Routes & Destination Beacon
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -430,24 +497,28 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       destMarkerRef.current.remove();
       destMarkerRef.current = null;
     }
+    if (destBeaconCircleRef.current) {
+      destBeaconCircleRef.current.remove();
+      destBeaconCircleRef.current = null;
+    }
 
     if (!selectedRoute || !selectedRoute.coordinates || selectedRoute.coordinates.length < 2) return;
 
     const latLngs = selectedRoute.coordinates.map(c => [c.lat, c.lng] as [number, number]);
 
-    // Outer Waze-style route casing
+    // Outer glow navigation casing
     const outerPoly = L.polyline(latLngs, {
-      color: '#3b0764',
-      weight: 11,
-      opacity: 0.9,
+      color: '#0369a1',
+      weight: 12,
+      opacity: 0.85,
       lineCap: 'round',
       lineJoin: 'round',
     }).addTo(mapRef.current);
     altRouteLineRef.current = outerPoly;
 
-    // Inner Waze-style vibrant route line
+    // Inner glowing electric cyan route laser line
     const primaryPoly = L.polyline(latLngs, {
-      color: '#8b5cf6',
+      color: '#06b6d4',
       weight: 6.5,
       opacity: 1,
       lineCap: 'round',
@@ -455,14 +526,24 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     }).addTo(mapRef.current);
     primaryRouteLineRef.current = primaryPoly;
 
-    // Destination Pin Marker at the end of the route
+    // Destination Pin Marker & Pulsing Arrival Beacon
     const lastCoord = selectedRoute.coordinates[selectedRoute.coordinates.length - 1];
+
+    const arrivalBeacon = L.circle([lastCoord.lat, lastCoord.lng], {
+      radius: 40,
+      color: '#10b981',
+      fillColor: '#34d399',
+      fillOpacity: 0.25,
+      weight: 2.5,
+    }).addTo(mapRef.current);
+    destBeaconCircleRef.current = arrivalBeacon;
+
     const destHtml = `
       <div class="relative flex flex-col items-center group cursor-pointer" style="transform: translate(-50%, -100%);">
-        <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-rose-600 to-red-500 border-2 border-white flex items-center justify-center shadow-2xl text-white font-black animate-bounce">
-          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 border-2 border-white flex items-center justify-center shadow-2xl text-white font-black animate-bounce ring-4 ring-emerald-400/40">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
         </div>
-        <div class="mt-0.5 px-2.5 py-0.5 bg-slate-950/95 text-white font-black text-[10px] rounded-full shadow-lg whitespace-nowrap border border-cyan-500/50">
+        <div class="mt-0.5 px-2.5 py-0.5 bg-slate-950/95 text-white font-black text-[10px] rounded-full shadow-lg whitespace-nowrap border border-emerald-400/60">
           🏁 ${selectedRoute.title || 'Destino'}
         </div>
       </div>
@@ -471,7 +552,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     const destIcon = L.divIcon({
       className: 'tp-dest-pin-marker',
       html: destHtml,
-      iconSize: [36, 36],
+      iconSize: [40, 40],
       iconAnchor: [0, 0],
     });
 
@@ -1011,6 +1092,56 @@ export const GPSMap: React.FC<GPSMapProps> = ({
             })}
           </div>
 
+          {/* Proximity Speed Camera (Pardal) Alert Banner */}
+          {nearbyRadar && (
+            <div className="pointer-events-auto max-w-lg w-full bg-gradient-to-r from-red-950/95 via-slate-950/95 to-amber-950/95 border-2 border-red-500 rounded-2xl p-3 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-4 duration-300">
+              <div className="flex items-center justify-between gap-3">
+                {/* Brazilian Regulatory Speed Limit Sign (Placa R-19) */}
+                <div className={`w-12 h-12 rounded-full bg-white border-4 border-red-600 flex flex-col items-center justify-center shrink-0 shadow-xl ${isOverSpeed ? 'animate-bounce ring-4 ring-red-500' : 'ring-2 ring-red-500/50'}`}>
+                  <span className="text-slate-950 font-black text-sm leading-none">{radarSpeedLimit}</span>
+                  <span className="text-slate-700 font-bold text-[7px] leading-none uppercase">km/h</span>
+                </div>
+
+                {/* Radar Details */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-md bg-red-600 text-white font-black text-[9px] uppercase tracking-wider flex items-center gap-1 animate-pulse shadow">
+                      📸 RADAR / PARDAL APROXIMANDO-SE
+                    </span>
+                    <span className="text-xs font-black text-amber-300 font-mono">
+                      A {radarDistance} METROS
+                    </span>
+                  </div>
+                  <div className="text-xs font-black text-white truncate mt-1">
+                    {nearbyRadar.title} • {nearbyRadar.locationName || 'Trecho Monitorado'}
+                  </div>
+                  {isOverSpeed ? (
+                    <div className="text-[10px] font-black text-rose-300 flex items-center gap-1 mt-0.5 animate-pulse">
+                      ⚠️ VELOCIDADE ({currentSpeed} km/h) ACIMA DO LIMITE! REDUZA A VELOCIDADE!
+                    </div>
+                  ) : (
+                    <div className="text-[10px] font-bold text-emerald-400 mt-0.5 flex items-center gap-1">
+                      <span>✓</span>
+                      <span>Velocidade monitorada ({currentSpeed} km/h) compatível com a via</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Camera / Action icon */}
+                <button
+                  onClick={() => {
+                    setSelectedMapOccurrence(nearbyRadar);
+                    setSelectedMapPlace(null);
+                  }}
+                  className="p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-red-500/50 text-red-400 hover:text-white shrink-0 text-xs font-bold transition-all"
+                  title="Ver Detalhes do Radar"
+                >
+                  <Camera className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Active Risk Zone Entry Alert & Live Countdown/Elapsed Timer Until Exit */}
           {activeRiskZone && (
             <div className="pointer-events-auto max-w-md bg-gradient-to-r from-red-950/95 via-rose-950/95 to-slate-950/95 border-2 border-rose-500 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md animate-in fade-in duration-200">
@@ -1466,18 +1597,80 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         </div>
       </div>
 
-      {/* Floating Info & Night Mode Highlight Pill */}
-      <div className="absolute bottom-20 left-3 z-20 flex flex-wrap items-center gap-1.5 pointer-events-none">
-        {is3DMode && (
-          <div className="px-2.5 py-1 rounded-xl bg-lime-400 text-slate-950 font-black text-[10px] tracking-wider uppercase shadow-lg shadow-lime-500/20 border border-lime-300">
-            Modo 3D Ativo
+      {/* Technological Cockpit Telemetry HUD Widget (Speedometer + Regulatory Speed Limit Sign + Gyro Compass Rose + RTK Precision) */}
+      <div className="absolute bottom-24 sm:bottom-6 left-3 z-20 flex flex-col gap-2 pointer-events-auto select-none">
+        {/* Upper Telemetry Bar: Speedometer + Regulatory Speed Limit Sign + Gyro Compass */}
+        <div className="flex items-center gap-2 bg-slate-950/90 backdrop-blur-xl border border-cyan-500/40 rounded-2xl p-2 shadow-2xl shadow-black/80">
+          {/* Digital Speedometer Gauge */}
+          <div className="flex flex-col items-center justify-center min-w-[54px] px-2 py-1 rounded-xl bg-slate-900/90 border border-slate-700/80 shadow-inner">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none tracking-tight text-white">
+              {currentSpeed}
+            </span>
+            <span className="text-[9px] font-black uppercase text-cyan-400 tracking-wider mt-0.5">
+              km/h
+            </span>
           </div>
-        )}
-        {activeLayer === 'dark' && (
-          <div className="px-2.5 py-1 rounded-xl bg-indigo-950/90 text-amber-300 font-black text-[10px] shadow-lg border border-amber-400/60 flex items-center gap-1.5">
-            <span>🌙 Modo Noturno Ativo • 💡 Destacando Vias Sem Iluminação e 🚫 Sem Sinalização</span>
+
+          {/* Regulatory Speed Limit Sign (Placa R-19) */}
+          <div
+            className="w-10 h-10 rounded-full bg-white border-[3.5px] border-red-600 flex flex-col items-center justify-center shrink-0 shadow-md ring-2 ring-red-500/30"
+            title="Limite Regulamentar da Via (DETRAN / CONTRAN)"
+          >
+            <span className="text-slate-950 font-black text-xs leading-none">{radarSpeedLimit}</span>
+            <span className="text-slate-600 font-black text-[6px] leading-none uppercase">km/h</span>
           </div>
-        )}
+
+          {/* Gyro Compass Rose with Tap-to-Lock North */}
+          <button
+            onClick={() => {
+              if (mapRef.current) {
+                mapRef.current.panTo([currentLocation.lat, currentLocation.lng], { animate: true });
+              }
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-white transition-all active:scale-95 group"
+            title="Bússola Giroscópica (Clique para Centralizar ao Norte)"
+          >
+            <div className="relative w-6 h-6 flex items-center justify-center">
+              <Compass
+                className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform"
+                style={{ transform: `rotate(${-heading}deg)` }}
+              />
+              <div className="absolute -top-0.5 text-[8px] font-black text-red-500">N</div>
+            </div>
+            <div className="flex flex-col text-left leading-none">
+              <span className="text-[10px] font-black text-white font-mono">
+                {getCardinalDirection(heading)}
+              </span>
+              <span className="text-[8px] text-slate-400 font-mono">
+                {String(Math.round(heading % 360)).padStart(3, '0')}°
+              </span>
+            </div>
+          </button>
+        </div>
+
+        {/* RTK High Precision Satellite Telemetry Pill */}
+        <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md border border-slate-800/90 rounded-xl px-2.5 py-1 shadow-lg text-[10px] text-slate-300 w-fit">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+          <span className="font-semibold">🛰️ GNSS RTK Satélites</span>
+          <span className="text-cyan-300 font-bold font-mono">±{gpsAccuracy || 3}m</span>
+          <span className="px-1.5 py-0.2 rounded bg-emerald-950 border border-emerald-500/40 text-emerald-400 font-black text-[8px] uppercase">
+            Alta Precisão
+          </span>
+        </div>
+
+        {/* 3D Mode & Night Mode Highlights */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {is3DMode && (
+            <div className="px-2 py-0.5 rounded-lg bg-lime-400 text-slate-950 font-black text-[9px] tracking-wider uppercase shadow-md border border-lime-300">
+              Modo 3D Ativo
+            </div>
+          )}
+          {activeLayer === 'dark' && (
+            <div className="px-2 py-0.5 rounded-lg bg-indigo-950/90 text-amber-300 font-black text-[9px] shadow border border-amber-400/60 flex items-center gap-1">
+              <span>🌙 Noturno Ativo • 💡 Vias Escuras & 🚫 Sem Sinalização em Destaque</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
