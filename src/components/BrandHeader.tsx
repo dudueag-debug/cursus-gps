@@ -16,8 +16,8 @@ import type { UserProfile, WeatherData } from '../types';
 
 interface BrandHeaderProps {
   user: UserProfile;
-  activePanel: 'map' | 'waze' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile';
-  setActivePanel: (panel: 'map' | 'waze' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile') => void;
+  activePanel: 'map' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile';
+  setActivePanel: (panel: 'map' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile') => void;
   openSafetyModal: () => void;
   openInstallModal: () => void;
   openVoiceModal: () => void;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Building2, 
   HeartPulse, 
@@ -14,19 +14,15 @@ import {
   Sparkles,
   Home,
   CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  Pencil,
   Crosshair,
-  BadgeAlert,
-  ChevronRight,
-  ExternalLink,
-  Store,
   Disc,
   Pill,
-  ShoppingCart
+  ShoppingCart,
+  Store,
+  Pencil,
+  AlertCircle
 } from 'lucide-react';
-import { Place, PlaceCategory, Coordinates, HomeAddress } from '../../types';
+import { Place, Coordinates, HomeAddress } from '../../types';
 import { api } from '../../services/api';
 import { userService } from '../../services/userService';
 import { RIO_NEIGHBORHOODS_LIST } from '../../../server/services/placesDataService';
@@ -56,7 +52,10 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
 
   // Origin mode: Near Me vs Near Home vs Custom Location
   const [originMode, setOriginMode] = useState<OriginMode>('near_me');
-  const [homeAddress, setHomeAddress] = useState<HomeAddress | null>(null);
+  const [homeAddress, setHomeAddress] = useState<HomeAddress | null>(() => {
+    const session = userService.getActiveSession();
+    return session && session.id ? userService.getHomeAddress(session.id) : null;
+  });
   const [customAddressQuery, setCustomAddressQuery] = useState('');
   const [customCenterCoords, setCustomCenterCoords] = useState<Coordinates | null>(null);
   const [customAddressLabel, setCustomAddressLabel] = useState<string>('');
@@ -71,17 +70,8 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
   const [homeCepInput, setHomeCepInput] = useState('');
   const [homeSaveSuccess, setHomeSaveSuccess] = useState(false);
 
-  // Load home address from user profile
-  useEffect(() => {
-    const session = userService.getActiveSession();
-    if (session && session.id) {
-      const savedHome = userService.getHomeAddress(session.id);
-      setHomeAddress(savedHome);
-    }
-  }, []);
-
   // Compute active reference coordinates for search
-  const getActiveCenterCoords = (): { coords: Coordinates; label: string; mode: OriginMode } => {
+  const getActiveCenterCoords = useCallback((): { coords: Coordinates; label: string; mode: OriginMode } => {
     if (originMode === 'near_home' && homeAddress) {
       return {
         coords: homeAddress.coordinates,
@@ -104,9 +94,9 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
       label: 'Localização Atual (GPS Ao Vivo)',
       mode: 'near_me',
     };
-  };
+  }, [originMode, homeAddress, customCenterCoords, customAddressLabel, userCoords]);
 
-  const fetchPlaces = async () => {
+  const fetchPlaces = useCallback(async () => {
     setLoading(true);
     try {
       const { coords } = getActiveCenterCoords();
@@ -124,11 +114,11 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [getActiveCenterCoords, searchQuery, radiusKm, selectedCategory, onPlacesUpdated]);
 
   useEffect(() => {
     fetchPlaces();
-  }, [selectedCategory, radiusKm, originMode, customCenterCoords, userCoords.lat, userCoords.lng]);
+  }, [fetchPlaces]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();

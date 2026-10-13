@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import type { Coordinates, RouteOption, Occurrence, CultureSpot, UserProfile, MapLayerType, Place } from '../../types';
 import { createVehicleDivIcon } from './VehicleMarkerIcon';
-import { Crosshair, ZoomIn, ZoomOut, Eye, Layers, Compass, Box, Map as MapIcon, Globe, Navigation, MapPin, Phone, Star, X, Camera, AlertTriangle, Clock, ShieldAlert } from 'lucide-react';
+import { Crosshair, ZoomIn, ZoomOut, Eye, Layers, Compass, Box, Map as MapIcon, Globe, Navigation, MapPin, Phone, Star, X, Camera, AlertTriangle, Clock, ShieldAlert, Sparkles } from 'lucide-react';
 
 interface GPSMapProps {
   currentLocation: Coordinates;
@@ -110,12 +110,15 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   const [selectedMapOccurrence, setSelectedMapOccurrence] = useState<Occurrence | null>(null);
   const [tappedMapCoords, setTappedMapCoords] = useState<Coordinates | null>(null);
 
+  const [currentZoom, setCurrentZoom] = useState<number>(15);
+  const [isDeclutterActive, setIsDeclutterActive] = useState<boolean>(false);
+
   // Active Risk Zone Entry Alert & Live Timer until exiting the zone
   const [activeRiskZone, setActiveRiskZone] = useState<Occurrence | null>(null);
   const [zoneSecondsElapsed, setZoneSecondsElapsed] = useState<number>(0);
   const [zoneDismissedId, setZoneDismissedId] = useState<string | null>(null);
 
-  // Professional Watermark-Free Layer Definitions for Brazil & Worldwide
+  // Professional Watermark-Free Layer Definitions for Brazil & Worldwide (Zero Waze dependencies)
   const getLayerConfig = (layer: MapLayerType) => {
     switch (layer) {
       case 'satellite':
@@ -127,14 +130,14 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         };
       case 'topo':
         return {
-          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+          url: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
           maxZoom: 19,
           className: '',
-          attribution: '&copy; TÔ PASSANDO Topografia',
+          attribution: '&copy; TÔ PASSANDO Topografia & Cartografia Limpa',
         };
       case 'dark':
         return {
-          url: 'https://worldtiles3.waze.com/tiles/{z}/{x}/{y}.png',
+          url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
           maxZoom: 19,
           className: 'leaflet-tile-futuristic-dark',
           attribution: '&copy; TÔ PASSANDO Noturno Automático',
@@ -142,7 +145,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       case 'streets':
       default:
         return {
-          url: 'https://worldtiles3.waze.com/tiles/{z}/{x}/{y}.png',
+          url: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
           maxZoom: 19,
           className: '',
           attribution: '&copy; TÔ PASSANDO Cartografia Ao Vivo',
@@ -305,6 +308,13 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         if (onMapClick) {
           onMapClick(clicked);
         }
+      });
+
+      // Track zoom level changes dynamically to declutter the map when zoomed out
+      map.on('zoomend', () => {
+        try {
+          setCurrentZoom(map.getZoom());
+        } catch {}
       });
 
       mapRef.current = map;
@@ -694,13 +704,31 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     return place.category === cat;
   };
 
-  // Render Verified Places & Real Neighborhood Establishments with Real Photos on Map
+  // Render Verified Places & Real Neighborhood Establishments with Adaptive Decluttering & Real Photos
   useEffect(() => {
     if (!mapRef.current || !placesLayerGroupRef.current) return;
     const group = placesLayerGroupRef.current;
     group.clearLayers();
 
-    const visiblePlaces = places.filter(p => matchPlaceCategory(p, activeMapCategory));
+    // When Declutter Mode is active or during Active Navigation, prioritize clean roads unless a specific category was picked
+    if ((isDeclutterActive || isNavigating) && activeMapCategory === 'all') {
+      return;
+    }
+
+    const filtered = places.filter(p => matchPlaceCategory(p, activeMapCategory));
+
+    // Declutter guard: Sort by distance and cap visible places to the closest 35 to prevent DOM & visual overcrowding
+    const visiblePlaces = filtered
+      .map(p => ({
+        ...p,
+        _dist: calcDistanceMeters(currentLocation, p.coordinates),
+      }))
+      .sort((a, b) => a._dist - b._dist)
+      .slice(0, 35);
+
+    const isHighZoom = currentZoom >= 16;   // Street level: show full photo card with name & star rating
+    const isMediumZoom = currentZoom >= 14; // District level: show compact photo thumbnail badge without text clutter
+    // Low zoom (< 14): show sleek, compact 22px category pin to keep arterial roads 100% clean
 
     visiblePlaces.forEach(place => {
       let bgColor = 'bg-slate-700';
@@ -717,6 +745,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         iconEmoji = '🚓';
       } else if (place.category === 'posto_gnv') {
         bgColor = 'bg-cyan-600';
+        borderColor = 'border-cyan-300';
         iconEmoji = '⛽';
       } else if (place.category === 'borracheiro') {
         bgColor = 'bg-amber-600';
@@ -781,40 +810,57 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         iconEmoji = '🏖️';
       }
 
-      const ratingTag = place.rating !== undefined ? `★${place.rating.toFixed(1)}` : '';
-      const shortPlaceName =
-        place.name.length > 22 ? `${place.name.slice(0, 20)}…` : place.name;
+      let iconHtml = '';
 
-      // Render Real Photo Thumbnail Pin directly on the Map
-      const iconHtml = place.photoUrl
-        ? `
-        <div class="relative flex flex-col items-center justify-center cursor-pointer group">
-          <div class="relative w-10 h-10 rounded-xl overflow-hidden border-2 ${borderColor} shadow-2xl transition-transform group-hover:scale-125 bg-slate-900">
-            <img src="${place.photoUrl}" class="w-full h-full object-cover" alt="" />
-            <span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full ${bgColor} border border-white flex items-center justify-center text-[9px] leading-none shadow">
-              ${iconEmoji}
-            </span>
+      if (isHighZoom && place.photoUrl) {
+        // High Zoom: Full Photo Thumbnail with Name & Star Rating
+        const ratingTag = place.rating !== undefined ? `★${place.rating.toFixed(1)}` : '';
+        const shortPlaceName = place.name.length > 20 ? `${place.name.slice(0, 18)}…` : place.name;
+        iconHtml = `
+          <div class="relative flex flex-col items-center justify-center cursor-pointer group">
+            <div class="relative w-9 h-9 rounded-xl overflow-hidden border-2 ${borderColor} shadow-xl transition-transform group-hover:scale-125 bg-slate-900">
+              <img src="${place.photoUrl}" class="w-full h-full object-cover" alt="" loading="lazy" />
+              <span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${bgColor} border border-white flex items-center justify-center text-[8.5px] leading-none shadow">
+                ${iconEmoji}
+              </span>
+            </div>
+            <div class="mt-0.5 px-1.5 py-0.2 rounded bg-slate-950/95 text-white font-black text-[8px] shadow border border-white/25 whitespace-nowrap flex items-center gap-1">
+              <span>${shortPlaceName}</span>
+              ${ratingTag ? `<span class="text-amber-400">${ratingTag}</span>` : ''}
+            </div>
           </div>
-          <div class="mt-0.5 px-1.5 py-0.2 rounded-md bg-slate-950/95 text-white font-black text-[8.5px] shadow-md border border-white/25 whitespace-nowrap flex items-center gap-1">
-            <span>${shortPlaceName}</span>
-            ${ratingTag ? `<span class="text-amber-400">${ratingTag}</span>` : ''}
+        `;
+      } else if (isMediumZoom && place.photoUrl) {
+        // Medium Zoom: Compact Photo Thumbnail Badge without permanent overlapping text box
+        iconHtml = `
+          <div class="relative flex flex-col items-center justify-center cursor-pointer group">
+            <div class="relative w-7 h-7 rounded-lg overflow-hidden border-2 ${borderColor} shadow-md transition-transform group-hover:scale-130 bg-slate-900">
+              <img src="${place.photoUrl}" class="w-full h-full object-cover" alt="" loading="lazy" />
+              <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${bgColor} border border-white flex items-center justify-center text-[7.5px] leading-none shadow">
+                ${iconEmoji}
+              </span>
+            </div>
           </div>
-        </div>
-      `
-        : `
-        <div class="relative flex flex-col items-center justify-center cursor-pointer group">
-          <div class="w-8 h-8 rounded-full ${bgColor} border-2 ${borderColor} flex items-center justify-center shadow-xl transition-transform hover:scale-125">
-            <span class="text-sm leading-none">${iconEmoji}</span>
+        `;
+      } else {
+        // Low Zoom or without photo: Sleek Minimalist Circular Category Pin (leaves avenues & turns 100% visible)
+        iconHtml = `
+          <div class="relative flex items-center justify-center cursor-pointer group">
+            <div class="w-6 h-6 rounded-full ${bgColor} border border-white flex items-center justify-center shadow-md transition-transform group-hover:scale-130">
+              <span class="text-[11px] leading-none">${iconEmoji}</span>
+            </div>
           </div>
-          ${ratingTag ? `<span class="mt-0.5 px-1 py-0.2 rounded bg-slate-950/90 text-amber-400 font-black text-[8px] shadow border border-amber-500/40 whitespace-nowrap">${ratingTag}</span>` : ''}
-        </div>
-      `;
+        `;
+      }
+
+      const iconSize: [number, number] = isHighZoom ? [48, 52] : isMediumZoom ? [32, 32] : [24, 24];
+      const iconAnchor: [number, number] = isHighZoom ? [24, 26] : isMediumZoom ? [16, 16] : [12, 12];
 
       const placeIcon = L.divIcon({
         className: 'tp-place-marker',
         html: iconHtml,
-        iconSize: [52, 54],
-        iconAnchor: [26, 27],
+        iconSize,
+        iconAnchor,
       });
 
       const marker = L.marker([place.coordinates.lat, place.coordinates.lng], { icon: placeIcon, zIndexOffset: 500 });
@@ -826,18 +872,18 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
       marker.bindTooltip(`
         <div class="text-xs p-1.5 font-semibold text-slate-900 max-w-[250px]">
-          ${place.photoUrl ? `<div class="w-full h-24 rounded-lg overflow-hidden mb-1.5 relative border border-slate-300"><img src="${place.photoUrl}" class="w-full h-full object-cover"/>${place.rating !== undefined ? `<span class="absolute top-1 right-1 bg-slate-950/90 text-amber-400 text-[10px] font-black px-1.5 py-0.5 rounded">★ ${place.rating.toFixed(1)}</span>` : ''}<span class="absolute bottom-1 left-1 bg-slate-950/85 text-lime-300 text-[9px] font-bold px-1.5 py-0.2 rounded">📸 Foto Real do Local</span></div>` : ''}
+          ${place.photoUrl ? `<div class="w-full h-24 rounded-lg overflow-hidden mb-1.5 relative border border-slate-300"><img src="${place.photoUrl}" class="w-full h-full object-cover"/>${place.rating !== undefined ? `<span class="absolute top-1 right-1 bg-slate-950/90 text-amber-400 text-[10px] font-black px-1.5 py-0.5 rounded">★ ${place.rating.toFixed(1)}</span>` : ''}<span class="absolute bottom-1 left-1 bg-slate-950/85 text-lime-300 text-[9px] font-bold px-1.5 py-0.2 rounded">📸 Foto Real</span></div>` : ''}
           <div class="font-black text-slate-900">${iconEmoji} ${place.name}</div>
           <div class="text-[10px] text-slate-700 font-bold">${place.address}${place.neighborhood ? ` — ${place.neighborhood}` : ''}</div>
           ${place.rating !== undefined ? `<div class="text-[10px] text-amber-600 font-bold">★ ${place.rating.toFixed(1)} ${place.ratingCount ? `(${place.ratingCount.toLocaleString('pt-BR')} avaliações)` : ''}</div>` : ''}
           <div class="text-[10px] text-slate-600 font-normal">${place.subCategory} ${place.distanceMeters ? `• ${place.distanceMeters < 1000 ? `${place.distanceMeters}m` : `${(place.distanceMeters / 1000).toFixed(1)}km`}` : ''}</div>
           ${place.verifiedReferencePoint ? `<div class="text-[9.5px] text-cyan-800 font-bold mt-0.5">📍 Ref: ${place.verifiedReferencePoint}</div>` : ''}
         </div>
-      `, { direction: 'top', offset: [0, -16] });
+      `, { direction: 'top', offset: [0, -14] });
 
       group.addLayer(marker);
     });
-  }, [places, activeMapCategory]);
+  }, [places, activeMapCategory, currentZoom, isDeclutterActive, isNavigating, currentLocation.lat, currentLocation.lng]);
 
   // Select category pill on map and pan to nearest matching place
   const handleSelectMapCategory = (catKey: string) => {
@@ -931,6 +977,20 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 <span>👮📸 Fica Atento Tô Passando ({occurrences.length})</span>
               </button>
             )}
+
+            {/* Quick Declutter / Clean Visual Map Toggle */}
+            <button
+              onClick={() => setIsDeclutterActive(!isDeclutterActive)}
+              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black shadow-xl border active:scale-95 transition-all ${
+                isDeclutterActive
+                  ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 border-amber-300 ring-2 ring-amber-400/40 shadow-amber-500/30'
+                  : 'bg-slate-950/90 hover:bg-slate-900 text-emerald-300 border-emerald-500/40'
+              }`}
+              title={isDeclutterActive ? 'Modo Limpo Ativo (Pistas Despoluídas). Clique para reexibir todos os comércios.' : 'Despoluir Mapa (Ocultar comércios secundários e deixar pistas limpas)'}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{isDeclutterActive ? '✨ Mapa Despoluído' : '🧹 Despoluir Mapa'}</span>
+            </button>
 
             {MAP_QUICK_CATEGORIES.map(cat => {
               const isSelected = activeMapCategory === cat.key;
@@ -1290,6 +1350,19 @@ export const GPSMap: React.FC<GPSMapProps> = ({
           title={is3DMode ? 'Desativar Visão 3D' : 'Ativar Modo Cockpit 3D'}
         >
           <Box className="w-5 h-5" />
+        </button>
+
+        {/* Quick Declutter HUD Toggle Button */}
+        <button
+          onClick={() => setIsDeclutterActive(!isDeclutterActive)}
+          className={`p-3 rounded-xl shadow-xl border backdrop-blur-md active:scale-95 transition-all flex items-center justify-center ${
+            isDeclutterActive
+              ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-amber-500/25 ring-2 ring-amber-400/50'
+              : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700/80'
+          }`}
+          title={isDeclutterActive ? 'Modo Limpo Ativo (Mostrando Apenas Alertas e Rotas) — Clique para Exibir Todos os Locais' : 'Despoluir Mapa (Ocultar Comércios Secundários e Limpar Pistas)'}
+        >
+          <Sparkles className="w-5 h-5 text-amber-300" />
         </button>
 
         {/* Layers Menu Trigger */}

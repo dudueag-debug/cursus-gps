@@ -86,7 +86,7 @@ export function App() {
   });
 
   // Active Navigation & View State
-  const [activePanel, setActivePanel] = useState<'map' | 'waze' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile'>('map');
+  const [activePanel, setActivePanel] = useState<'map' | 'places' | 'occurrences' | 'safety' | 'culture' | 'profile'>('map');
   const [isNavigating, setIsNavigating] = useState(false);
 
   // Geographic Coordinates (Real GPS or Cached Coordinates)
@@ -936,7 +936,7 @@ export function App() {
         )}
 
         {/* Side / Drawer Panel depending on active tab */}
-        {!isNavigating && activePanel !== 'map' && activePanel !== 'waze' && (
+        {!isNavigating && activePanel !== 'map' && (
           <div className="absolute inset-x-0 bottom-0 top-[52px] lg:static lg:top-auto lg:bottom-auto w-full lg:w-[460px] xl:w-[500px] bg-slate-950/98 border-t lg:border-t-0 lg:border-l border-slate-800 p-3 sm:p-4 overflow-y-auto max-h-full shadow-2xl z-40 flex flex-col">
             {/* Mobile close bar */}
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 lg:hidden shrink-0">
