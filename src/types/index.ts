@@ -277,7 +277,8 @@ export type PlaceCategory =
   | 'turismo'
   | 'alimentacao'
   | 'hospedagem'
-  | 'estacionamento';
+  | 'estacionamento'
+  | 'cachoeira';
 
 export interface Place {
   id: string;

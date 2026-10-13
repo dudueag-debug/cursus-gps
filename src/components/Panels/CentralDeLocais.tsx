@@ -201,12 +201,16 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
 
   const categories = [
     { key: 'all', label: 'Todos do Bairro & Região', icon: <Building2 className="w-4 h-4" /> },
-    { key: 'posto_gnv', label: '⛽ Postos de Gasolina & GNV', icon: <Fuel className="w-4 h-4 text-cyan-400" /> },
+    { key: 'shopping', label: '🛍️ Todos os Shoppings do RJ', icon: <Store className="w-4 h-4 text-pink-400" /> },
+    { key: 'saude', label: '🏥 Hospitais & UPAs 24h', icon: <HeartPulse className="w-4 h-4 text-red-400" /> },
+    { key: 'estacionamento', label: '🅿️ Estacionamentos 24h & Garagens', icon: <Building2 className="w-4 h-4 text-cyan-400" /> },
+    { key: 'parque_praia', label: '🏖️ Praias do Rio & Niterói', icon: <Compass className="w-4 h-4 text-sky-400" /> },
+    { key: 'cachoeira', label: '🏞️ Cachoeiras & Parques Naturais', icon: <Compass className="w-4 h-4 text-teal-400" /> },
     { key: 'supermercado', label: '🛒 Grandes Mercados & Atacadões', icon: <ShoppingCart className="w-4 h-4 text-lime-400" /> },
     { key: 'mercado', label: '🏪 Mercados Locais & Padarias', icon: <Store className="w-4 h-4 text-emerald-400" /> },
+    { key: 'posto_gnv', label: '⛽ Postos de Gasolina & GNV', icon: <Fuel className="w-4 h-4 text-cyan-400" /> },
     { key: 'material_construcao', label: '🔨 Materiais de Construção', icon: <Store className="w-4 h-4 text-amber-500" /> },
     { key: 'educacao', label: '🎓 Escolas Locais & Faculdades', icon: <Building2 className="w-4 h-4 text-indigo-400" /> },
-    { key: 'saude', label: '🏥 UPAs & Hospitais 24h', icon: <HeartPulse className="w-4 h-4 text-red-400" /> },
     { key: 'oficina', label: '🔧 Mecânicos & Oficinas', icon: <Disc className="w-4 h-4 text-orange-400" /> },
     { key: 'funilaria_pintura', label: '🎨 Pintores de Carros & Funilaria', icon: <Sparkles className="w-4 h-4 text-pink-400" /> },
     { key: 'borracheiro', label: '🛞 Borracheiros 24h', icon: <Disc className="w-4 h-4 text-amber-400" /> },
@@ -218,8 +222,6 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
     { key: 'igreja', label: '⛪ Igrejas & Templos', icon: <Building2 className="w-4 h-4 text-violet-400" /> },
     { key: 'esporte_lazer', label: '⚽ Estádios, Paintball & Zoo', icon: <Compass className="w-4 h-4 text-orange-400" /> },
     { key: 'presidio', label: '🔒 Complexos Penitenciários', icon: <ShieldAlert className="w-4 h-4 text-rose-500" /> },
-    { key: 'shopping', label: '🛍️ Shoppings', icon: <Store className="w-4 h-4 text-pink-400" /> },
-    { key: 'parque_praia', label: '🏖️ Praias & Lazer', icon: <Compass className="w-4 h-4 text-purple-400" /> },
   ];
 
   const activeCenter = getActiveCenterCoords();
@@ -231,7 +233,7 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <Building2 className="w-6 h-6 text-cyan-400" />
-            <h2 className="text-lg font-black tracking-tight text-white">Comércios do Seu Bairro & Serviços Verificados</h2>
+            <h2 className="text-lg font-black tracking-tight text-white">Shoppings, Hospitais, Praias, Cachoeiras & Comércios Reais do RJ</h2>
           </div>
           <p className="text-xs text-slate-400">
             Postos, mercados locais e grandes, materiais de construção, escolas, UPAs, hospitais, mecânicos, funilaria/pintura e borracheiros com fotos reais e avaliações.

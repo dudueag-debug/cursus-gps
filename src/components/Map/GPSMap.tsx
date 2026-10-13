@@ -32,15 +32,19 @@ interface GPSMapProps {
 
 const MAP_QUICK_CATEGORIES = [
   { key: 'all', label: 'Tudo no Mapa', emoji: '🗺️' },
-  { key: 'posto_gnv', label: 'Postos & GNV', emoji: '⛽' },
+  { key: 'shopping', label: 'Shoppings Reais', emoji: '🛍️' },
+  { key: 'saude', label: 'Hospitais & UPAs', emoji: '🏥' },
+  { key: 'estacionamento', label: 'Estacionamentos 24h', emoji: '🅿️' },
+  { key: 'parque_praia', label: 'Praias do RJ', emoji: '🏖️' },
+  { key: 'cachoeira', label: 'Cachoeiras & Florestas', emoji: '🏞️' },
   { key: 'supermercado', label: 'Supermercados', emoji: '🛒' },
   { key: 'mercado', label: 'Mercados Locais', emoji: '🏪' },
+  { key: 'posto_gnv', label: 'Postos & GNV', emoji: '⛽' },
+  { key: 'material_construcao', label: 'Mat. Construção', emoji: '🔨' },
+  { key: 'educacao', label: 'Escolas & Faculdades', emoji: '🎓' },
   { key: 'oficina', label: 'Mecânicos', emoji: '🔧' },
   { key: 'funilaria_pintura', label: 'Funilaria & Pintura', emoji: '🎨' },
   { key: 'borracheiro', label: 'Borracharias 24h', emoji: '🛞' },
-  { key: 'material_construcao', label: 'Mat. Construção', emoji: '🔨' },
-  { key: 'saude', label: 'UPAs & Hospitais', emoji: '🏥' },
-  { key: 'educacao', label: 'Escolas & Faculdades', emoji: '🎓' },
   { key: 'policia', label: 'Polícia & Batalhões', emoji: '🚓' },
 ];
 
@@ -675,10 +679,22 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     if (cat === 'mercado') {
       return place.category === 'mercado';
     }
+    if (cat === 'parque_praia') {
+      return place.category === 'parque_praia';
+    }
+    if (cat === 'cachoeira') {
+      return place.category === 'cachoeira';
+    }
+    if (cat === 'estacionamento') {
+      return place.category === 'estacionamento';
+    }
+    if (cat === 'shopping') {
+      return place.category === 'shopping';
+    }
     return place.category === cat;
   };
 
-  // Render Verified Places & Neighborhood Commerce POIs on Map
+  // Render Verified Places & Real Neighborhood Establishments with Real Photos on Map
   useEffect(() => {
     if (!mapRef.current || !placesLayerGroupRef.current) return;
     const group = placesLayerGroupRef.current;
@@ -693,9 +709,11 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
       if (place.category === 'saude' || place.category === 'upa' || place.category === 'hospital' || place.category === 'posto_saude') {
         bgColor = 'bg-red-600';
+        borderColor = 'border-red-300';
         iconEmoji = '🏥';
       } else if (place.category === 'policia' || place.category === 'delegacia' || place.category === 'batalhao' || place.category === 'dpo') {
         bgColor = 'bg-blue-600';
+        borderColor = 'border-blue-300';
         iconEmoji = '🚓';
       } else if (place.category === 'posto_gnv') {
         bgColor = 'bg-cyan-600';
@@ -747,15 +765,43 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         iconEmoji = '🔒';
       } else if (place.category === 'shopping') {
         bgColor = 'bg-pink-600';
+        borderColor = 'border-pink-300';
         iconEmoji = '🛍️';
+      } else if (place.category === 'estacionamento') {
+        bgColor = 'bg-blue-700';
+        borderColor = 'border-cyan-300';
+        iconEmoji = '🅿️';
+      } else if (place.category === 'cachoeira') {
+        bgColor = 'bg-teal-600';
+        borderColor = 'border-teal-300';
+        iconEmoji = '🏞️';
       } else if (place.category === 'parque_praia' || place.category === 'lazer_cultura') {
-        bgColor = 'bg-purple-600';
+        bgColor = 'bg-sky-600';
+        borderColor = 'border-sky-300';
         iconEmoji = '🏖️';
       }
 
       const ratingTag = place.rating !== undefined ? `★${place.rating.toFixed(1)}` : '';
+      const shortPlaceName =
+        place.name.length > 22 ? `${place.name.slice(0, 20)}…` : place.name;
 
-      const iconHtml = `
+      // Render Real Photo Thumbnail Pin directly on the Map
+      const iconHtml = place.photoUrl
+        ? `
+        <div class="relative flex flex-col items-center justify-center cursor-pointer group">
+          <div class="relative w-10 h-10 rounded-xl overflow-hidden border-2 ${borderColor} shadow-2xl transition-transform group-hover:scale-125 bg-slate-900">
+            <img src="${place.photoUrl}" class="w-full h-full object-cover" alt="" />
+            <span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full ${bgColor} border border-white flex items-center justify-center text-[9px] leading-none shadow">
+              ${iconEmoji}
+            </span>
+          </div>
+          <div class="mt-0.5 px-1.5 py-0.2 rounded-md bg-slate-950/95 text-white font-black text-[8.5px] shadow-md border border-white/25 whitespace-nowrap flex items-center gap-1">
+            <span>${shortPlaceName}</span>
+            ${ratingTag ? `<span class="text-amber-400">${ratingTag}</span>` : ''}
+          </div>
+        </div>
+      `
+        : `
         <div class="relative flex flex-col items-center justify-center cursor-pointer group">
           <div class="w-8 h-8 rounded-full ${bgColor} border-2 ${borderColor} flex items-center justify-center shadow-xl transition-transform hover:scale-125">
             <span class="text-sm leading-none">${iconEmoji}</span>
@@ -767,25 +813,27 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       const placeIcon = L.divIcon({
         className: 'tp-place-marker',
         html: iconHtml,
-        iconSize: [36, 40],
-        iconAnchor: [18, 20],
+        iconSize: [52, 54],
+        iconAnchor: [26, 27],
       });
 
       const marker = L.marker([place.coordinates.lat, place.coordinates.lng], { icon: placeIcon, zIndexOffset: 500 });
       marker.on('click', () => {
+        setSelectedMapOccurrence(null);
         setSelectedMapPlace(place);
         mapRef.current?.panTo([place.coordinates.lat, place.coordinates.lng], { animate: true });
       });
 
       marker.bindTooltip(`
-        <div class="text-xs p-1 font-semibold text-slate-900 max-w-[240px]">
-          ${place.photoUrl ? `<div class="w-full h-20 rounded overflow-hidden mb-1 relative"><img src="${place.photoUrl}" class="w-full h-full object-cover"/>${place.rating !== undefined ? `<span class="absolute top-1 right-1 bg-slate-950/90 text-amber-400 text-[10px] font-black px-1.5 py-0.5 rounded">★ ${place.rating.toFixed(1)}</span>` : ''}</div>` : ''}
-          <div class="font-bold text-slate-900">${place.name}</div>
+        <div class="text-xs p-1.5 font-semibold text-slate-900 max-w-[250px]">
+          ${place.photoUrl ? `<div class="w-full h-24 rounded-lg overflow-hidden mb-1.5 relative border border-slate-300"><img src="${place.photoUrl}" class="w-full h-full object-cover"/>${place.rating !== undefined ? `<span class="absolute top-1 right-1 bg-slate-950/90 text-amber-400 text-[10px] font-black px-1.5 py-0.5 rounded">★ ${place.rating.toFixed(1)}</span>` : ''}<span class="absolute bottom-1 left-1 bg-slate-950/85 text-lime-300 text-[9px] font-bold px-1.5 py-0.2 rounded">📸 Foto Real do Local</span></div>` : ''}
+          <div class="font-black text-slate-900">${iconEmoji} ${place.name}</div>
+          <div class="text-[10px] text-slate-700 font-bold">${place.address}${place.neighborhood ? ` — ${place.neighborhood}` : ''}</div>
           ${place.rating !== undefined ? `<div class="text-[10px] text-amber-600 font-bold">★ ${place.rating.toFixed(1)} ${place.ratingCount ? `(${place.ratingCount.toLocaleString('pt-BR')} avaliações)` : ''}</div>` : ''}
           <div class="text-[10px] text-slate-600 font-normal">${place.subCategory} ${place.distanceMeters ? `• ${place.distanceMeters < 1000 ? `${place.distanceMeters}m` : `${(place.distanceMeters / 1000).toFixed(1)}km`}` : ''}</div>
-          ${place.verifiedReferencePoint ? `<div class="text-[9px] text-cyan-800 font-medium mt-0.5">📍 Ref: ${place.verifiedReferencePoint}</div>` : ''}
+          ${place.verifiedReferencePoint ? `<div class="text-[9.5px] text-cyan-800 font-bold mt-0.5">📍 Ref: ${place.verifiedReferencePoint}</div>` : ''}
         </div>
-      `, { direction: 'top', offset: [0, -12] });
+      `, { direction: 'top', offset: [0, -16] });
 
       group.addLayer(marker);
     });

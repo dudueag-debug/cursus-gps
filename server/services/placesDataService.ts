@@ -1,4 +1,5 @@
 import { Coordinates } from '../../src/types';
+import { RIO_REAL_ESTABLISHMENTS } from '../../src/data/rioRealEstablishments';
 
 export interface VerifiedPlaceRecord {
   id: string;
@@ -1821,8 +1822,12 @@ export class PlacesDataService {
     const { centerCoords, query, category, unitType, radiusKm = 5 } = filter;
     const maxRadiusMeters = radiusKm * 1000;
 
-    // Combine static verified catalog, full Rio de Janeiro all-neighborhoods catalog, and hyper-local neighborhood establishments
-    const baseAndNeighborhoods = [...RIO_VERIFIED_PLACES, ...RIO_ALL_NEIGHBORHOODS_COMMERCE];
+    // Combine static verified catalog, 100% real Rio establishments (Shoppings, Hospitals, Parking, Beaches, Waterfalls), and neighborhood commerce
+    const baseAndNeighborhoods = [
+      ...RIO_VERIFIED_PLACES,
+      ...RIO_REAL_ESTABLISHMENTS,
+      ...RIO_ALL_NEIGHBORHOODS_COMMERCE,
+    ];
     const baseWithin1500m = baseAndNeighborhoods.filter(
       p => getDistanceMeters(centerCoords, p.coordinates) <= 1500
     );
@@ -1867,7 +1872,9 @@ export class PlacesDataService {
             p.category === 'borracheiro' ||
             p.category === 'oficina' ||
             p.category === 'funilaria_pintura' ||
-            p.category === 'material_construcao'
+            p.category === 'material_construcao' ||
+            p.category === 'estacionamento' ||
+            p.category === 'shopping'
           );
         }
         if (catLower === 'supermercado') {
@@ -1891,8 +1898,17 @@ export class PlacesDataService {
         if (catLower === 'presidio') {
           return p.category === 'presidio';
         }
+        if (catLower === 'estacionamento') {
+          return p.category === 'estacionamento';
+        }
+        if (catLower === 'cachoeira') {
+          return p.category === 'cachoeira';
+        }
+        if (catLower === 'parque_praia') {
+          return p.category === 'parque_praia' || p.category === 'cachoeira';
+        }
         if (catLower === 'esporte_lazer') {
-          return p.category === 'esporte' || p.category === 'paintball' || p.category === 'zoologico' || p.category === 'parque_praia';
+          return p.category === 'esporte' || p.category === 'paintball' || p.category === 'zoologico' || p.category === 'parque_praia' || p.category === 'cachoeira';
         }
         return p.category.toLowerCase() === catLower;
       });
