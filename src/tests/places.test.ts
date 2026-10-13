@@ -256,5 +256,44 @@ describe('Busca Inteligente de Lugares e Serviços (Rule of Truth & Places Servi
       expect(userService.getHomeAddress(testUserId)).toBeNull();
     });
   });
+
+  describe('Polo Senador Camará / Fazenda Coqueiros / Vila Kennedy / Santíssimo (Google Maps -22.866325, -43.4933632)', () => {
+    const fazendaCoqueiroCoords: Coordinates = { lat: -22.866325, lng: -43.4933632 };
+
+    it('should find verified real establishments in radius around Google Maps link coordinates', () => {
+      const placesAround = PlacesDataService.searchPlaces({
+        centerCoords: fazendaCoqueiroCoords,
+        radiusKm: 4,
+      });
+
+      expect(placesAround.length).toBeGreaterThanOrEqual(10);
+
+      const placeNames = placesAround.map(p => p.name);
+
+      // Verify essential real landmarks exist
+      expect(placeNames.some(n => n.includes('Senador Camará'))).toBe(true);
+      expect(placeNames.some(n => n.includes('Vila Kennedy'))).toBe(true);
+      expect(placeNames.some(n => n.includes('Prezunic'))).toBe(true);
+      expect(placeNames.some(n => n.includes('Oxalá') || n.includes('Querubim'))).toBe(true);
+      expect(placeNames.some(n => n.includes('Praça Miami') || n.includes('Liberdade'))).toBe(true);
+    });
+
+    it('should have real verified reference points and valid photo URLs for Senador Camará / Vila Kennedy places', () => {
+      const placesAround = PlacesDataService.searchPlaces({
+        centerCoords: fazendaCoqueiroCoords,
+        radiusKm: 3.5,
+      });
+
+      placesAround.forEach(p => {
+        expect(p.coordinates.lat).toBeCloseTo(-22.86, 0);
+        expect(p.coordinates.lng).toBeCloseTo(-43.49, 0);
+        expect(p.photoUrl).toMatch(/^https:\/\//);
+        expect(p.photoAttribution).toBeDefined();
+        expect(p.verifiedReferencePoint).toBeDefined();
+        expect(p.rating).toBeGreaterThanOrEqual(4.0);
+      });
+    });
+  });
 });
+
 
