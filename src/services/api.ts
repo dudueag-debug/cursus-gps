@@ -861,21 +861,8 @@ export const api = {
    * Search places around centerCoords with text query, category and radius (km)
    */
   async searchPlaces(query: string, options: { centerCoords: Coordinates; radiusKm?: number; category?: string }): Promise<Place[]> {
-    const { centerCoords, radiusKm = 5, category } = options;
-    const params = new URLSearchParams({
-      lat: centerCoords.lat.toString(),
-      lng: centerCoords.lng.toString(),
-      radius: radiusKm.toString(),
-    });
-    if (query && query.trim().length > 0) params.append('query', query.trim());
-    if (category && category !== 'all') params.append('category', category);
+    const { centerCoords, radiusKm = 25, category } = options;
 
-    const data = await safeJsonFetch(`${API_BASE}/places/search?${params.toString()}`);
-    if (data && Array.isArray(data.places) && data.places.length > 0) {
-      return data.places;
-    }
-
-    // Resilient fallback to verified local PlacesDataService
     try {
       const { PlacesDataService } = await import('../../server/services/placesDataService');
       const local = PlacesDataService.searchPlaces({
@@ -889,48 +876,63 @@ export const api = {
       }
     } catch {}
 
-    return this.getPlaces(category, query, centerCoords);
+    const params = new URLSearchParams({
+      lat: centerCoords.lat.toString(),
+      lng: centerCoords.lng.toString(),
+      radius: radiusKm.toString(),
+    });
+    if (query && query.trim().length > 0) params.append('query', query.trim());
+    if (category && category !== 'all') params.append('category', category);
+
+    const data = await safeJsonFetch(`${API_BASE}/places/search?${params.toString()}`);
+    if (data && Array.isArray(data.places) && data.places.length > 0) {
+      return data.places;
+    }
+
+    return [];
   },
 
   /**
    * Quick discovery of nearby places within radius (e.g. 2km, 5km, 10km)
    */
   async getNearbyPlaces(centerCoords: Coordinates, options?: { radiusKm?: number; category?: string }): Promise<Place[]> {
-    return this.searchPlaces('', { centerCoords, radiusKm: options?.radiusKm || 2, category: options?.category });
+    return this.searchPlaces('', { centerCoords, radiusKm: options?.radiusKm || 5, category: options?.category });
   },
 
   /**
    * Specialized search for verified Health units (UPAs, Hospitals, Clinics)
    */
-  async getHealthUnits(centerCoords: Coordinates, radiusKm: number = 10): Promise<Place[]> {
+  async getHealthUnits(centerCoords: Coordinates, radiusKm: number = 15): Promise<Place[]> {
+    try {
+      const { PlacesDataService } = await import('../../server/services/placesDataService');
+      const local = PlacesDataService.getHealthUnits(centerCoords, radiusKm);
+      if (local && local.length > 0) {
+        return local.map(p => ({ ...p, dataOrigin: 'real' as const })) as Place[];
+      }
+    } catch {}
     const data = await safeJsonFetch(`${API_BASE}/places/health-units?lat=${centerCoords.lat}&lng=${centerCoords.lng}&radius=${radiusKm}`);
     if (data && Array.isArray(data.units) && data.units.length > 0) {
       return data.units;
     }
-    try {
-      const { PlacesDataService } = await import('../../server/services/placesDataService');
-      const local = PlacesDataService.getHealthUnits(centerCoords, radiusKm);
-      return local.map(p => ({ ...p, dataOrigin: 'real' as const })) as Place[];
-    } catch {
-      return this.getPlaces('saude', undefined, centerCoords);
-    }
+    return this.getPlaces('saude', undefined, centerCoords);
   },
 
   /**
    * Specialized search for verified Police and Public Safety units (Civil, Military, DPO)
    */
-  async getPoliceUnits(centerCoords: Coordinates, radiusKm: number = 10): Promise<Place[]> {
+  async getPoliceUnits(centerCoords: Coordinates, radiusKm: number = 15): Promise<Place[]> {
+    try {
+      const { PlacesDataService } = await import('../../server/services/placesDataService');
+      const local = PlacesDataService.getPoliceUnits(centerCoords, radiusKm);
+      if (local && local.length > 0) {
+        return local.map(p => ({ ...p, dataOrigin: 'real' as const })) as Place[];
+      }
+    } catch {}
     const data = await safeJsonFetch(`${API_BASE}/places/police-units?lat=${centerCoords.lat}&lng=${centerCoords.lng}&radius=${radiusKm}`);
     if (data && Array.isArray(data.units) && data.units.length > 0) {
       return data.units;
     }
-    try {
-      const { PlacesDataService } = await import('../../server/services/placesDataService');
-      const local = PlacesDataService.getPoliceUnits(centerCoords, radiusKm);
-      return local.map(p => ({ ...p, dataOrigin: 'real' as const })) as Place[];
-    } catch {
-      return this.getPlaces('policia', undefined, centerCoords);
-    }
+    return this.getPlaces('policia', undefined, centerCoords);
   },
 
   async getPlaces(category?: string, query?: string, userCoords?: Coordinates): Promise<Place[]> {
@@ -940,25 +942,11 @@ export const api = {
     try {
       const places = await this.searchPlaces(query || '', {
         centerCoords,
-        radiusKm: 35,
+        radiusKm: 65,
         category: category || undefined,
       });
       if (places && places.length > 0) {
         return places;
-      }
-    } catch {}
-
-    // Fallback directly to local catalog if server unreachable
-    try {
-      const { PlacesDataService } = await import('../../server/services/placesDataService');
-      const local = PlacesDataService.searchPlaces({
-        centerCoords,
-        query,
-        category,
-        radiusKm: 45,
-      });
-      if (local && local.length > 0) {
-        return local.map(p => ({ ...p, dataOrigin: 'real' as const })) as Place[];
       }
     } catch {}
 

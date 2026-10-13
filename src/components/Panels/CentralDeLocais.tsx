@@ -29,6 +29,7 @@ import {
 import { Place, PlaceCategory, Coordinates, HomeAddress } from '../../types';
 import { api } from '../../services/api';
 import { userService } from '../../services/userService';
+import { RIO_NEIGHBORHOODS_LIST } from '../../../server/services/placesDataService';
 
 interface CentralDeLocaisProps {
   onRouteToPlace: (place: Place) => void;
@@ -49,7 +50,9 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [radiusKm, setRadiusKm] = useState<number>(5);
+  const [radiusKm, setRadiusKm] = useState<number>(65);
+  const [selectedZone, setSelectedZone] = useState<string>('all');
+  const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState<string>('all');
 
   // Origin mode: Near Me vs Near Home vs Custom Location
   const [originMode, setOriginMode] = useState<OriginMode>('near_me');
@@ -411,23 +414,111 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
         </div>
       )}
 
-      {/* Radius Configuration (2 km, 5 km, 10 km, 15 km) */}
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-400 font-semibold">Raio de Cobertura Geográfica:</span>
-        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-          {[2, 5, 10, 15].map(r => (
+      {/* Rio de Janeiro All Zones & Neighborhoods Selector */}
+      <div className="bg-slate-950/90 border border-emerald-500/30 rounded-xl p-3 flex flex-col gap-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-black text-emerald-400">
+            <MapPin className="w-4 h-4" />
+            <span>Comércios em Todo o Rio de Janeiro (Todos os Bairros)</span>
+          </div>
+          <span className="text-[11px] font-bold text-slate-300">
+            {places.length} comércios e serviços mapeados
+          </span>
+        </div>
+
+        {/* Zone Quick Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          {[
+            { key: 'all', label: '🌎 Todo o Rio de Janeiro' },
+            { key: 'Centro & Zona Portuária', label: '🏛️ Centro & Porto' },
+            { key: 'Zona Sul', label: '🏖️ Zona Sul' },
+            { key: 'Zona Norte', label: '🏘️ Zona Norte' },
+            { key: 'Zona Oeste', label: '🌴 Zona Oeste' },
+            { key: 'Baixada & Grande Rio', label: '🏙️ Baixada & Niterói' },
+          ].map(z => (
             <button
-              key={r}
-              onClick={() => setRadiusKm(r)}
-              className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
-                radiusKm === r
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              key={z.key}
+              onClick={() => {
+                setSelectedZone(z.key);
+                setSelectedNeighborhoodId('all');
+                if (z.key === 'all') {
+                  setOriginMode('near_me');
+                  setRadiusKm(65);
+                } else {
+                  const firstInZone = RIO_NEIGHBORHOODS_LIST.find(n => n.zone === z.key);
+                  if (firstInZone) {
+                    setCustomCenterCoords(firstInZone.coordinates);
+                    setCustomAddressLabel(`${z.label} — Rio de Janeiro`);
+                    setOriginMode('custom_location');
+                    setRadiusKm(20);
+                  }
+                }
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black whitespace-nowrap transition-all ${
+                selectedZone === z.key
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                  : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
               }`}
             >
-              {r} km
+              {z.label}
             </button>
           ))}
+        </div>
+
+        {/* Specific Neighborhood Dropdown */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <select
+            value={selectedNeighborhoodId}
+            onChange={e => {
+              const nbId = e.target.value;
+              setSelectedNeighborhoodId(nbId);
+              if (nbId === 'all') {
+                setOriginMode('near_me');
+                setRadiusKm(65);
+              } else {
+                const found = RIO_NEIGHBORHOODS_LIST.find(n => n.id === nbId);
+                if (found) {
+                  setCustomCenterCoords(found.coordinates);
+                  setCustomAddressLabel(`${found.name} (${found.city})`);
+                  setOriginMode('custom_location');
+                  setRadiusKm(5);
+                }
+              }
+            }}
+            className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400"
+          >
+            <option value="all">📍 Ver Todos os Bairros do Rio de Janeiro ({RIO_NEIGHBORHOODS_LIST.length} polos e bairros)</option>
+            {(selectedZone === 'all'
+              ? RIO_NEIGHBORHOODS_LIST
+              : RIO_NEIGHBORHOODS_LIST.filter(n => n.zone === selectedZone)
+            ).map(nb => (
+              <option key={nb.id} value={nb.id}>
+                {nb.zone}: {nb.name} — {nb.mainAvenue}
+              </option>
+            ))}
+          </select>
+
+          {/* Radius Configuration (2 km, 5 km, 15 km, Todo o RJ 65 km) */}
+          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 shrink-0">
+            {[
+              { r: 2, label: '2 km' },
+              { r: 5, label: '5 km' },
+              { r: 15, label: '15 km' },
+              { r: 65, label: 'Todo RJ' },
+            ].map(item => (
+              <button
+                key={item.r}
+                onClick={() => setRadiusKm(item.r)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all ${
+                  radiusKm === item.r
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -455,7 +546,7 @@ export const CentralDeLocais: React.FC<CentralDeLocaisProps> = ({
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Buscar por nome, rua, UPA, delegacia, farmácia ou posto..."
+          placeholder="Buscar em qualquer bairro do RJ (ex: Copacabana, Madureira, Bangu, Caxias, mercado, oficina, UPA)..."
           className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-24 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
         />
         <Search className="absolute left-3 w-4 h-4 text-slate-400" />

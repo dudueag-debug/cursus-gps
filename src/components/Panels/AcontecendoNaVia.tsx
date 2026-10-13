@@ -45,7 +45,7 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
 
   const loadOccurrences = async () => {
     try {
-      const data = await api.getOccurrences();
+      const data = await api.getOccurrences(currentLocation);
       setOccurrences(data);
     } catch (e) {
       console.error(e);
@@ -56,7 +56,7 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
 
   useEffect(() => {
     loadOccurrences();
-  }, []);
+  }, [currentLocation.lat, currentLocation.lng]);
 
   const handleConfirmAction = async (id: string, action: 'confirm_active' | 'vote_resolved' | 'report_fake') => {
     try {
@@ -214,6 +214,19 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
 
                 <p className="text-xs text-slate-300">{occ.description}</p>
 
+                {occ.photoUrl && (
+                  <div className="relative h-28 rounded-xl overflow-hidden border border-slate-700">
+                    <img
+                      src={occ.photoUrl}
+                      alt={occ.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-1.5 left-2 px-2 py-0.5 rounded bg-slate-950/90 text-[10px] font-bold text-lime-300 border border-lime-500/30">
+                      📸 Foto do Local em Tempo Real
+                    </span>
+                  </div>
+                )}
+
                 {/* Normalization Message if resolved */}
                 {occ.isNormalized && occ.normalizationMessage && (
                   <div className="bg-emerald-950/50 border border-emerald-700/60 rounded-lg p-2.5 text-xs text-emerald-200 flex items-start gap-2">
@@ -232,6 +245,12 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
                   {occ.affectedLanes && (
                     <div>
                       <span className="text-slate-500">Faixa:</span> {occ.affectedLanes}
+                    </div>
+                  )}
+
+                  {occ.riskRadiusMeters && (
+                    <div className="text-rose-400 font-bold">
+                      ⚠️ Zona demarcada ({occ.riskRadiusMeters}m)
                     </div>
                   )}
 
@@ -351,7 +370,7 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <h3 className="font-bold text-base text-white flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-400" />
-                Relatar Ocorrência na Via
+                Relatar Ocorrência na Via em Tempo Real
               </h3>
               <button onClick={() => setIsReportingModalOpen(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
@@ -366,23 +385,25 @@ export const AcontecendoNaVia: React.FC<AcontecendoNaViaProps> = ({
                   onChange={e => setNewCategory(e.target.value as OccurrenceCategory)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-slate-200 text-xs"
                 >
-                  <option value="engarrafamento">🚗 Engarrafamento / Trânsito Parado</option>
-                  <option value="alagamento">🌊 Ponto de Alagamento</option>
-                  <option value="buraco">🕳️ Buraco na Via / Pavimento Danificado</option>
-                  <option value="objeto_via">📦 Objeto / Obstáculo na Via</option>
-                  <option value="veiculo_parado">🛑 Veículo Parado / Quebrado na Pista</option>
-                  <option value="acidente">💥 Acidente de Trânsito</option>
+                  <option value="roubo_celular_semaforo">📱 Roubo de Telefone no Engarrafamento / Semáforo</option>
+                  <option value="roubo_carro_moto">🚨 Roubo de Carro / Moto / Pedestre</option>
+                  <option value="local_perigoso">⚡ Bairro Perigoso / Zona de Alto Risco</option>
                   <option value="blitz">👮‍♂️ Blitz / Fiscalização Policial</option>
-                  <option value="via_parcialmente_interditada">⚠️ Via Parcialmente Interditada</option>
+                  <option value="policiamento_ativo">🚓 Policiamento Ativo Presente</option>
+                  <option value="radar">📸 Pardal / Limite de Velocidade</option>
+                  <option value="engarrafamento">🚗 Engarrafamento / Trânsito Parado</option>
+                  <option value="lentidao">🐢 Lentidão na Via</option>
+                  <option value="alagamento">🌊 Ponto de Alagamento</option>
+                  <option value="buraco">🕳️ Buraco na Via</option>
+                  <option value="trecho_buracos">🕳️ Trecho com Muitos Buracos</option>
+                  <option value="falta_pavimentacao">🚧 Falta de Pavimentação / Sem Asfalto</option>
+                  <option value="falta_iluminacao">💡 Falta de Iluminação Pública (Via Escura)</option>
+                  <option value="sem_sinalizacao">⚠️ Via Sem Sinalização / Sem Placa</option>
+                  <option value="acidente">💥 Acidente de Trânsito</option>
                   <option value="via_interditada">⛔ Via Interditada (Fechada Totalmente)</option>
-                  <option value="acesso_fechado">🚫 Via de Acesso Fechada (Saídas e Entradas)</option>
-                  <option value="ponto_roubo">🚨 Ponto de Roubos / Área de Risco</option>
-                  <option value="local_perigoso">⚡ Identificar Local Perigoso</option>
-                  <option value="obras">🚧 Obras / Fresagem / Recapeamento</option>
-                  <option value="oleo_pista">🛢️ Óleo na Pista / Pista Escorregadia</option>
+                  <option value="obras">🚧 Obras / Recapeamento</option>
                   <option value="semaforo_defeito">🚦 Semáforo com Defeito</option>
                 </select>
-
               </div>
 
               <div>

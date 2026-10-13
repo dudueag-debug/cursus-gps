@@ -960,7 +960,6 @@ export function App() {
                     setPlaces(updatedPlaces);
                   }}
                   onSelectPlaceOnMap={(place) => {
-                    setPlaces([place]);
                     setCurrentLocation(place.coordinates);
                     setActivePanel('map');
                   }}
@@ -971,6 +970,7 @@ export function App() {
                 <AcontecendoNaVia
                   currentLocation={currentLocation}
                   onSelectOccurrenceOnMap={occ => {
+                    setCurrentLocation(occ.coordinates);
                     setActivePanel('map');
                   }}
                   onRefreshMap={refreshOccurrences}
