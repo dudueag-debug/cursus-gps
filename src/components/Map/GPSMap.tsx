@@ -109,9 +109,8 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     return h >= 18 || h < 6;
   };
 
-  // Active layer & 3D perspective mode (Automatically starts in 'dark' Noturno mode when evening/night)
+  // Active layer & 3D perspective mode (Defaults to 'streets' for full Google Maps street names)
   const [activeLayer, setActiveLayer] = useState<MapLayerType>(() => {
-    if (isNightHourNow()) return 'dark';
     return user.mapLayerType || 'streets';
   });
   const [userManuallyChangedLayer, setUserManuallyChangedLayer] = useState<boolean>(false);
@@ -160,37 +159,41 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     }
   }, [nearbyRadar?.id, user.enableVoiceInstructions]);
 
-  // Professional Watermark-Free Layer Definitions for Brazil & Worldwide (Zero Waze dependencies)
+  // Professional Ultra-Detailed Cartography (100% Google Maps official road network with all street names & places)
   const getLayerConfig = (layer: MapLayerType) => {
     switch (layer) {
       case 'satellite':
         return {
-          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-          maxZoom: 19,
+          url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+          subdomains: ['0', '1', '2', '3'],
+          maxZoom: 21,
           className: '',
-          attribution: '&copy; TÔ PASSANDO Satélite HD',
+          attribution: '&copy; Tô Passando Satélite Google HD',
         };
       case 'topo':
         return {
-          url: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-          maxZoom: 19,
+          url: 'https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+          subdomains: ['0', '1', '2', '3'],
+          maxZoom: 21,
           className: '',
-          attribution: '&copy; TÔ PASSANDO Topografia & Cartografia Limpa',
+          attribution: '&copy; Tô Passando Relevo Google',
         };
       case 'dark':
         return {
-          url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-          maxZoom: 19,
-          className: 'leaflet-tile-futuristic-dark',
-          attribution: '&copy; TÔ PASSANDO Noturno Automático',
+          url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+          subdomains: ['0', '1', '2', '3'],
+          maxZoom: 21,
+          className: 'leaflet-tile-subtle-dark',
+          attribution: '&copy; Tô Passando Noturno Oficial',
         };
       case 'streets':
       default:
         return {
-          url: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-          maxZoom: 19,
+          url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+          subdomains: ['0', '1', '2', '3'],
+          maxZoom: 21,
           className: '',
-          attribution: '&copy; TÔ PASSANDO Cartografia Ao Vivo',
+          attribution: '&copy; Tô Passando Cartografia Oficial Google Maps',
         };
     }
   };
@@ -201,20 +204,18 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       maxZoom: config.maxZoom,
       attribution: config.attribution,
       className: config.className,
-      crossOrigin: true,
+      subdomains: config.subdomains,
       keepBuffer: 10,
       updateWhenIdle: false,
-      detectRetina: true,
-      subdomains: 'abcd',
     });
 
-    // Fallback on tile error to standard OSM
+    // Fallback on tile error to mt1 Google Maps standard
     tile.on('tileerror', (e: any) => {
       const img = e.tile;
       if (img && !img.dataset.fallback) {
         img.dataset.fallback = 'true';
         const { z, x, y } = e.coords;
-        img.src = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+        img.src = `https://mt1.google.com/vt/lyrs=m&x=${x}&y=${y}&z=${z}`;
       }
     });
 
@@ -234,18 +235,6 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     const newTile = createSafeTile(newLayer).addTo(mapRef.current);
     tileLayerRef.current = newTile;
   };
-
-  // Automatically switch to Night Mode ('dark') when dusk arrives (18:00 - 05:59)
-  useEffect(() => {
-    const checkAutoNight = () => {
-      if (!userManuallyChangedLayer && isNightHourNow() && activeLayer !== 'dark') {
-        switchLayer('dark', false);
-      }
-    };
-    checkAutoNight();
-    const interval = setInterval(checkAutoNight, 30000);
-    return () => clearInterval(interval);
-  }, [activeLayer, userManuallyChangedLayer]);
 
   // Monitor Real-Time GPS Entry into Dangerous / Risk Zones and Start Live Traversal Timer
   useEffect(() => {
@@ -1526,7 +1515,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 }`}
               >
                 <MapIcon className="w-4 h-4 text-lime-400" />
-                <span>🧭 Mapa Tô Passando (Ruas Ao Vivo)</span>
+                <span>🧭 Google Maps Ruas & Nomes (Oficial)</span>
               </button>
 
               <button
@@ -1538,7 +1527,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 }`}
               >
                 <Globe className="w-4 h-4 text-cyan-400" />
-                <span>🛰️ Satélite Real HD</span>
+                <span>🛰️ Google Satélite HD com Ruas</span>
               </button>
 
               <button
@@ -1550,7 +1539,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 }`}
               >
                 <Compass className="w-4 h-4 text-amber-400" />
-                <span>🏔️ Relevo / Topografia</span>
+                <span>🏔️ Google Relevo & Topografia</span>
               </button>
 
               <button
@@ -1562,7 +1551,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 }`}
               >
                 <Box className="w-4 h-4 text-indigo-400" />
-                <span>🌙 Tô Passando Noturno</span>
+                <span>🌙 Tô Passando Noturno Suave</span>
               </button>
             </div>
           )}

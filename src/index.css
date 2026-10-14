@@ -124,13 +124,12 @@ html, body, #root {
   box-shadow: none !important;
 }
 
-/* Noturno Futurista Neon Cyber Dark Map Tile Filter */
-.leaflet-tile-futuristic-dark,
-img.leaflet-tile.leaflet-tile-futuristic-dark,
-.leaflet-tile-pane img.leaflet-tile-futuristic-dark,
-.leaflet-layer img.leaflet-tile-futuristic-dark {
-  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(140%) saturate(160%) !important;
-  background-color: #050B14 !important;
+/* Modo Noturno Elegante e Suave (Preserva todos os nomes de ruas, avenidas e textos 100% legíveis) */
+.leaflet-tile-subtle-dark,
+img.leaflet-tile.leaflet-tile-subtle-dark,
+.leaflet-tile-pane img.leaflet-tile-subtle-dark,
+.leaflet-layer img.leaflet-tile-subtle-dark {
+  filter: brightness(0.85) contrast(1.12) saturate(0.95) !important;
 }
 
 /* Glow animation for critical warnings on highway */
