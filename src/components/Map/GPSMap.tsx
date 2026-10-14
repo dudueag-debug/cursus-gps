@@ -3,6 +3,7 @@ import L from 'leaflet';
 import type { Coordinates, RouteOption, Occurrence, CultureSpot, UserProfile, MapLayerType, Place } from '../../types';
 import { createVehicleDivIcon } from './VehicleMarkerIcon';
 import { Crosshair, ZoomIn, ZoomOut, Eye, Layers, Compass, Box, Map as MapIcon, Globe, Navigation, MapPin, Phone, Star, X, Camera, AlertTriangle, Clock, ShieldAlert, Sparkles } from 'lucide-react';
+import { RIO_COMMUNITY_ZONES, type RioCommunityRiskZone } from '../../data/rioCommunityZones';
 
 interface GPSMapProps {
   currentLocation: Coordinates;
@@ -102,6 +103,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   const occurrencesLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const cultureLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const placesLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const communityLayerGroupRef = useRef<L.LayerGroup | null>(null);
 
   // Automatic Night Mode detection when dusk arrives (18:00 to 05:59)
   const isNightHourNow = () => {
@@ -124,7 +126,13 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   const [currentZoom, setCurrentZoom] = useState<number>(15);
   const [isDeclutterActive, setIsDeclutterActive] = useState<boolean>(false);
 
-  // Active Risk Zone Entry Alert & Live Timer until exiting the zone
+  // Active Community Extreme Risk Zone & Live Traversal Timer
+  const [activeCommunityZone, setActiveCommunityZone] = useState<RioCommunityRiskZone | null>(null);
+  const [dismissedCommunityId, setDismissedCommunityId] = useState<string | null>(null);
+  const [communitySecondsElapsed, setCommunitySecondsElapsed] = useState<number>(0);
+  const lastAnnouncedCommunityIdRef = useRef<string | null>(null);
+
+  // Active Risk Zone Entry Alert & Live Timer until exiting the zone (strictly when passing nearby)
   const [activeRiskZone, setActiveRiskZone] = useState<Occurrence | null>(null);
   const [zoneSecondsElapsed, setZoneSecondsElapsed] = useState<number>(0);
   const [zoneDismissedId, setZoneDismissedId] = useState<string | null>(null);
@@ -236,7 +244,64 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     tileLayerRef.current = newTile;
   };
 
-  // Monitor Real-Time GPS Entry into Dangerous / Risk Zones and Start Live Traversal Timer
+  // Monitor Real-Time GPS Entry into Community / Extreme Risk Zones in Rio de Janeiro
+  useEffect(() => {
+    const nearbyCommunity = RIO_COMMUNITY_ZONES.find(zone => {
+      const dist = calcDistanceMeters(currentLocation, zone.coordinates);
+      return dist <= zone.radiusMeters;
+    });
+
+    if (nearbyCommunity && nearbyCommunity.id !== dismissedCommunityId) {
+      setActiveCommunityZone(prev => {
+        if (prev?.id !== nearbyCommunity.id) {
+          setCommunitySecondsElapsed(0);
+        }
+        return nearbyCommunity;
+      });
+
+      // Voice advisory alert when entering community area
+      if (nearbyCommunity.id !== lastAnnouncedCommunityIdRef.current) {
+        lastAnnouncedCommunityIdRef.current = nearbyCommunity.id;
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window && user.enableVoiceInstructions) {
+          try {
+            window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(
+              `Atenção: você está passando pela comunidade ${nearbyCommunity.name}. Área de extremo risco. Mantenha os vidros fechados, faróis baixos e velocidade moderada.`
+            );
+            msg.lang = 'pt-BR';
+            msg.rate = 1.05;
+            window.speechSynthesis.speak(msg);
+          } catch {}
+        }
+      }
+    } else {
+      if (activeCommunityZone && lastAnnouncedCommunityIdRef.current === activeCommunityZone.id) {
+        // Driver has safely exited the community zone!
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window && user.enableVoiceInstructions) {
+          try {
+            const msg = new SpeechSynthesisUtterance('Você saiu da área de comunidade. Travessia concluída com segurança.');
+            msg.lang = 'pt-BR';
+            msg.rate = 1.05;
+            window.speechSynthesis.speak(msg);
+          } catch {}
+        }
+        lastAnnouncedCommunityIdRef.current = null;
+      }
+      setActiveCommunityZone(null);
+      setCommunitySecondsElapsed(0);
+    }
+  }, [currentLocation.lat, currentLocation.lng, dismissedCommunityId, user.enableVoiceInstructions, activeCommunityZone]);
+
+  // Tick the live timer every second while the user is inside the community zone
+  useEffect(() => {
+    if (!activeCommunityZone) return;
+    const timer = setInterval(() => {
+      setCommunitySecondsElapsed(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [activeCommunityZone?.id]);
+
+  // Monitor Real-Time GPS Entry into Reported Dangerous / Risk Zones (ONLY when driver is passing through!)
   useEffect(() => {
     const riskCategories = new Set([
       'roubo_celular_semaforo',
@@ -244,11 +309,6 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       'roubo_pedestre',
       'ponto_roubo',
       'local_perigoso',
-      'falta_iluminacao',
-      'sem_sinalizacao',
-      'falta_pavimentacao',
-      'trecho_buracos',
-      'alagamento',
     ]);
 
     const activeZones = occurrences.filter(
@@ -260,7 +320,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
     for (const z of activeZones) {
       const dist = calcDistanceMeters(currentLocation, z.coordinates);
-      const triggerRadius = (z.riskRadiusMeters || 280) + 120;
+      const triggerRadius = z.riskRadiusMeters ? Math.min(z.riskRadiusMeters, 250) : 220;
       if (dist <= triggerRadius && dist < minDistance) {
         minDistance = dist;
         closestZone = z;
@@ -315,13 +375,15 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       // Professional Navigation Metric Scale Control (dynamic physical distance)
       L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
 
-      // Occurrences, Culture & Places layer groups
+      // Occurrences, Culture, Places & Community layer groups
       const occGroup = L.layerGroup().addTo(map);
       const culGroup = L.layerGroup().addTo(map);
       const plcGroup = L.layerGroup().addTo(map);
+      const comGroup = L.layerGroup().addTo(map);
       occurrencesLayerGroupRef.current = occGroup;
       cultureLayerGroupRef.current = culGroup;
       placesLayerGroupRef.current = plcGroup;
+      communityLayerGroupRef.current = comGroup;
 
       // Realistic 3D Vehicle Marker
       const markerIcon = createVehicleDivIcon(
@@ -741,6 +803,58 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     });
   }, [cultureSpots, onSelectCultureSpot]);
 
+  // Render Official Community & Extreme Risk Zones on Map with Safety Perimeter
+  useEffect(() => {
+    if (!mapRef.current || !communityLayerGroupRef.current) return;
+    const group = communityLayerGroupRef.current;
+    group.clearLayers();
+
+    RIO_COMMUNITY_ZONES.forEach(zone => {
+      // Crimson safety perimeter circle
+      const circle = L.circle([zone.coordinates.lat, zone.coordinates.lng], {
+        radius: zone.radiusMeters,
+        color: '#dc2626',
+        weight: 2,
+        dashArray: '5, 5',
+        opacity: 0.8,
+        fillColor: '#991b1b',
+        fillOpacity: 0.12,
+      });
+
+      // Subtle community badge pin
+      const iconHtml = `
+        <div class="relative flex flex-col items-center justify-center cursor-pointer group">
+          <div class="px-2 py-0.5 rounded-md bg-red-900/90 border border-red-500 text-white font-black text-[9px] shadow-lg flex items-center gap-1 backdrop-blur-sm">
+            <span>🛡️</span>
+            <span>${zone.name}</span>
+          </div>
+        </div>
+      `;
+
+      const badgeIcon = L.divIcon({
+        className: 'tp-community-marker',
+        html: iconHtml,
+        iconSize: [120, 24],
+        iconAnchor: [60, 12],
+      });
+
+      const marker = L.marker([zone.coordinates.lat, zone.coordinates.lng], { icon: badgeIcon, zIndexOffset: 400 });
+
+      const tooltipContent = `
+        <div class="text-xs p-1.5 font-semibold text-slate-900 max-w-[240px]">
+          <div class="font-black text-red-600 flex items-center gap-1">🚨 ${zone.name}</div>
+          <div class="text-[10px] text-slate-700 font-bold mt-0.5">${zone.complexName}</div>
+          <div class="text-[9.5px] text-amber-700 font-semibold mt-1">⚠️ ${zone.advice}</div>
+        </div>
+      `;
+      circle.bindTooltip(tooltipContent, { direction: 'top', offset: [0, -10] });
+      marker.bindTooltip(tooltipContent, { direction: 'top', offset: [0, -10] });
+
+      group.addLayer(circle);
+      group.addLayer(marker);
+    });
+  }, []);
+
   // Filter places based on activeMapCategory
   const matchPlaceCategory = (place: Place, cat: string): boolean => {
     if (!cat || cat === 'all') return true;
@@ -1126,6 +1240,42 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                   title="Ver Detalhes do Radar"
                 >
                   <Camera className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Active Community Zone Entry Alert & Live Traversal Timer */}
+          {activeCommunityZone && (
+            <div className="pointer-events-auto max-w-lg w-full bg-gradient-to-r from-red-950/98 via-rose-950/98 to-slate-950/98 border-2 border-red-500 rounded-2xl p-3 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-4 duration-300">
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-red-600 border-2 border-white flex items-center justify-center text-white shrink-0 shadow-lg animate-pulse">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-md bg-red-600 text-white font-black text-[9px] uppercase tracking-wider">
+                      🚨 ÁREA DE COMUNIDADE • EXTREMO RISCO
+                    </span>
+                    <span className="text-[10px] font-mono font-black text-amber-300 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-amber-400" />
+                      Tempo na comunidade: {String(Math.floor(communitySecondsElapsed / 60)).padStart(2, '0')}:
+                      {String(communitySecondsElapsed % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                  <div className="text-xs font-black text-white truncate mt-1">
+                    {activeCommunityZone.name} ({activeCommunityZone.complexName})
+                  </div>
+                  <div className="text-[10px] text-amber-200 mt-1 leading-snug font-semibold">
+                    🔒 Mantenha vidros levantados • 💡 Farol baixo • 🚗 Velocidade moderada e constante • ⚠️ Evite paradas e manobras bruscas
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDismissedCommunityId(activeCommunityZone.id)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900"
+                  title="Ocultar aviso"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
