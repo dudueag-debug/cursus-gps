@@ -696,55 +696,25 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         badgeBg = '#10B981';
       }
 
-      // Draw Colored Risk Zone Perimeter Circle on Map ("esse local fica com outra cor ou marcado")
-      if (!isResolved && (occ.riskRadiusMeters || isNightPriority)) {
-        const radius = occ.riskRadiusMeters || 220;
-        const circleColor = occ.zoneColor || badgeBg;
-        const highlightAtNight = isNightMode && isNightPriority;
-
-        const zoneCircle = L.circle([occ.coordinates.lat, occ.coordinates.lng], {
-          radius,
-          color: highlightAtNight ? '#fde047' : circleColor,
-          weight: highlightAtNight ? 3.5 : 2.5,
-          opacity: 0.95,
-          fillColor: circleColor,
-          fillOpacity: highlightAtNight ? 0.38 : 0.22,
-          dashArray: occ.category === 'roubo_celular_semaforo' || occ.category === 'local_perigoso' ? undefined : '6, 6',
-        });
-
-        zoneCircle.on('click', () => {
-          setSelectedMapPlace(null);
-          setSelectedMapOccurrence(occ);
-          setActiveRiskZone(occ);
-          setZoneSecondsElapsed(0);
-          onSelectOccurrence(occ);
-        });
-
-        group.addLayer(zoneCircle);
-      }
-
       const nightGlowClass =
         isNightMode && isNightPriority
           ? 'ring-4 ring-yellow-300 shadow-[0_0_22px_#fde047] scale-110'
           : '';
 
       const iconHtml = `
-        <div class="relative flex flex-col items-center justify-center cursor-pointer group">
-          <div class="w-9 h-9 rounded-full flex items-center justify-center shadow-xl border-2 border-white transition-transform hover:scale-125 ${nightGlowClass}" style="background-color: ${badgeBg}">
-            <span class="text-base leading-none">${badgeEmoji}</span>
+        <div class="relative flex items-center justify-center cursor-pointer group">
+          <div class="w-7 h-7 rounded-full flex items-center justify-center shadow-lg border-2 border-white transition-transform hover:scale-125 ${nightGlowClass}" style="background-color: ${badgeBg}">
+            <span class="text-xs leading-none">${badgeEmoji}</span>
           </div>
-          <span class="mt-0.5 px-1.5 py-0.2 rounded-full bg-slate-950/95 text-white font-black text-[9px] shadow border border-white/30 whitespace-nowrap">
-            ${shortLabel}
-          </span>
-          ${!isResolved ? '<span class="absolute -top-0.5 right-0 w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-ping"></span>' : ''}
+          ${!isResolved ? '<span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 border border-white animate-ping"></span>' : ''}
         </div>
       `;
 
       const occIcon = L.divIcon({
         className: 'tp-occ-marker',
         html: iconHtml,
-        iconSize: [48, 48],
-        iconAnchor: [24, 24],
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
       });
 
       const marker = L.marker([occ.coordinates.lat, occ.coordinates.lng], { icon: occIcon, zIndexOffset: 750 });
@@ -808,57 +778,27 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     });
   }, [cultureSpots, onSelectCultureSpot]);
 
-  // Render Official Community & Extreme Risk Zones on Map with Safety Perimeter
+  // Render Active Community Safety Perimeter ONLY when approaching / passing through (leaves cartography 100% clean)
   useEffect(() => {
     if (!mapRef.current || !communityLayerGroupRef.current) return;
     const group = communityLayerGroupRef.current;
     group.clearLayers();
 
-    RIO_COMMUNITY_ZONES.forEach(zone => {
-      // Crimson safety perimeter circle
-      const circle = L.circle([zone.coordinates.lat, zone.coordinates.lng], {
-        radius: zone.radiusMeters,
-        color: '#dc2626',
-        weight: 2,
-        dashArray: '5, 5',
-        opacity: 0.8,
-        fillColor: '#991b1b',
-        fillOpacity: 0.12,
-      });
+    if (!activeCommunityZone) return;
 
-      // Subtle community badge pin
-      const iconHtml = `
-        <div class="relative flex flex-col items-center justify-center cursor-pointer group">
-          <div class="px-2 py-0.5 rounded-md bg-red-900/90 border border-red-500 text-white font-black text-[9px] shadow-lg flex items-center gap-1 backdrop-blur-sm">
-            <span>🛡️</span>
-            <span>${zone.name}</span>
-          </div>
-        </div>
-      `;
-
-      const badgeIcon = L.divIcon({
-        className: 'tp-community-marker',
-        html: iconHtml,
-        iconSize: [120, 24],
-        iconAnchor: [60, 12],
-      });
-
-      const marker = L.marker([zone.coordinates.lat, zone.coordinates.lng], { icon: badgeIcon, zIndexOffset: 400 });
-
-      const tooltipContent = `
-        <div class="text-xs p-1.5 font-semibold text-slate-900 max-w-[240px]">
-          <div class="font-black text-red-600 flex items-center gap-1">🚨 ${zone.name}</div>
-          <div class="text-[10px] text-slate-700 font-bold mt-0.5">${zone.complexName}</div>
-          <div class="text-[9.5px] text-amber-700 font-semibold mt-1">⚠️ ${zone.advice}</div>
-        </div>
-      `;
-      circle.bindTooltip(tooltipContent, { direction: 'top', offset: [0, -10] });
-      marker.bindTooltip(tooltipContent, { direction: 'top', offset: [0, -10] });
-
-      group.addLayer(circle);
-      group.addLayer(marker);
+    // Safety perimeter circle only for the community zone being traversed
+    const circle = L.circle([activeCommunityZone.coordinates.lat, activeCommunityZone.coordinates.lng], {
+      radius: activeCommunityZone.radiusMeters,
+      color: '#dc2626',
+      weight: 2.5,
+      dashArray: '6, 6',
+      opacity: 0.9,
+      fillColor: '#991b1b',
+      fillOpacity: 0.16,
     });
-  }, []);
+
+    group.addLayer(circle);
+  }, [activeCommunityZone]);
 
   // Filter places based on activeMapCategory
   const matchPlaceCategory = (place: Place, cat: string): boolean => {
@@ -999,57 +939,20 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         iconEmoji = '🏖️';
       }
 
-      let iconHtml = '';
-
-      if (isHighZoom && place.photoUrl) {
-        // High Zoom: Full Photo Thumbnail with Name & Star Rating
-        const ratingTag = place.rating !== undefined ? `★${place.rating.toFixed(1)}` : '';
-        const shortPlaceName = place.name.length > 20 ? `${place.name.slice(0, 18)}…` : place.name;
-        iconHtml = `
-          <div class="relative flex flex-col items-center justify-center cursor-pointer group">
-            <div class="relative w-9 h-9 rounded-xl overflow-hidden border-2 ${borderColor} shadow-xl transition-transform group-hover:scale-125 bg-slate-900">
-              <img src="${place.photoUrl}" class="w-full h-full object-cover" alt="" loading="lazy" />
-              <span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${bgColor} border border-white flex items-center justify-center text-[8.5px] leading-none shadow">
-                ${iconEmoji}
-              </span>
-            </div>
-            <div class="mt-0.5 px-1.5 py-0.2 rounded bg-slate-950/95 text-white font-black text-[8px] shadow border border-white/25 whitespace-nowrap flex items-center gap-1">
-              <span>${shortPlaceName}</span>
-              ${ratingTag ? `<span class="text-amber-400">${ratingTag}</span>` : ''}
-            </div>
+      // Clean, minimalist Google Maps style POI pin (NO floating photos covering the streets)
+      const iconHtml = `
+        <div class="relative flex items-center justify-center cursor-pointer group">
+          <div class="w-6 h-6 rounded-full ${bgColor} border-2 border-white flex items-center justify-center shadow-md transition-transform group-hover:scale-130 group-hover:ring-2 group-hover:ring-cyan-400">
+            <span class="text-[11px] leading-none">${iconEmoji}</span>
           </div>
-        `;
-      } else if (isMediumZoom && place.photoUrl) {
-        // Medium Zoom: Compact Photo Thumbnail Badge without permanent overlapping text box
-        iconHtml = `
-          <div class="relative flex flex-col items-center justify-center cursor-pointer group">
-            <div class="relative w-7 h-7 rounded-lg overflow-hidden border-2 ${borderColor} shadow-md transition-transform group-hover:scale-130 bg-slate-900">
-              <img src="${place.photoUrl}" class="w-full h-full object-cover" alt="" loading="lazy" />
-              <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${bgColor} border border-white flex items-center justify-center text-[7.5px] leading-none shadow">
-                ${iconEmoji}
-              </span>
-            </div>
-          </div>
-        `;
-      } else {
-        // Low Zoom or without photo: Sleek Minimalist Circular Category Pin (leaves avenues & turns 100% visible)
-        iconHtml = `
-          <div class="relative flex items-center justify-center cursor-pointer group">
-            <div class="w-6 h-6 rounded-full ${bgColor} border border-white flex items-center justify-center shadow-md transition-transform group-hover:scale-130">
-              <span class="text-[11px] leading-none">${iconEmoji}</span>
-            </div>
-          </div>
-        `;
-      }
-
-      const iconSize: [number, number] = isHighZoom ? [48, 52] : isMediumZoom ? [32, 32] : [24, 24];
-      const iconAnchor: [number, number] = isHighZoom ? [24, 26] : isMediumZoom ? [16, 16] : [12, 12];
+        </div>
+      `;
 
       const placeIcon = L.divIcon({
         className: 'tp-place-marker',
         html: iconHtml,
-        iconSize,
-        iconAnchor,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
       });
 
       const marker = L.marker([place.coordinates.lat, place.coordinates.lng], { icon: placeIcon, zIndexOffset: 500 });
@@ -1060,15 +963,11 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       });
 
       marker.bindTooltip(`
-        <div class="text-xs p-1.5 font-semibold text-slate-900 max-w-[250px]">
-          ${place.photoUrl ? `<div class="w-full h-24 rounded-lg overflow-hidden mb-1.5 relative border border-slate-300"><img src="${place.photoUrl}" class="w-full h-full object-cover"/>${place.rating !== undefined ? `<span class="absolute top-1 right-1 bg-slate-950/90 text-amber-400 text-[10px] font-black px-1.5 py-0.5 rounded">★ ${place.rating.toFixed(1)}</span>` : ''}<span class="absolute bottom-1 left-1 bg-slate-950/85 text-lime-300 text-[9px] font-bold px-1.5 py-0.2 rounded">📸 Foto Real</span></div>` : ''}
+        <div class="text-xs p-1 font-semibold text-slate-900 max-w-[200px]">
           <div class="font-black text-slate-900">${iconEmoji} ${place.name}</div>
-          <div class="text-[10px] text-slate-700 font-bold">${place.address}${place.neighborhood ? ` — ${place.neighborhood}` : ''}</div>
-          ${place.rating !== undefined ? `<div class="text-[10px] text-amber-600 font-bold">★ ${place.rating.toFixed(1)} ${place.ratingCount ? `(${place.ratingCount.toLocaleString('pt-BR')} avaliações)` : ''}</div>` : ''}
-          <div class="text-[10px] text-slate-600 font-normal">${place.subCategory} ${place.distanceMeters ? `• ${place.distanceMeters < 1000 ? `${place.distanceMeters}m` : `${(place.distanceMeters / 1000).toFixed(1)}km`}` : ''}</div>
-          ${place.verifiedReferencePoint ? `<div class="text-[9.5px] text-cyan-800 font-bold mt-0.5">📍 Ref: ${place.verifiedReferencePoint}</div>` : ''}
+          <div class="text-[10px] text-slate-600">${place.subCategory}${place.rating ? ` • ★${place.rating.toFixed(1)}` : ''}</div>
         </div>
-      `, { direction: 'top', offset: [0, -14] });
+      `, { direction: 'top', offset: [0, -10] });
 
       group.addLayer(marker);
     });
