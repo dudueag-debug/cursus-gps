@@ -129,15 +129,21 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
   // Active Community Extreme Risk Zone & Live Traversal Timer
   const [activeCommunityZone, setActiveCommunityZone] = useState<RioCommunityRiskZone | null>(null);
+  const [approachingCommunityZone, setApproachingCommunityZone] = useState<{
+    zone: RioCommunityRiskZone;
+    distanceMeters: number;
+  } | null>(null);
   const [dismissedCommunityId, setDismissedCommunityId] = useState<string | null>(null);
   const [communitySecondsElapsed, setCommunitySecondsElapsed] = useState<number>(0);
   const lastAnnouncedCommunityIdRef = useRef<string | null>(null);
+  const lastAnnouncedApproachingIdRef = useRef<string | null>(null);
 
   // Active Risk Zone Entry Alert & Live Timer until exiting the zone (strictly when passing nearby)
   const [activeRiskZone, setActiveRiskZone] = useState<Occurrence | null>(null);
   const [zoneSecondsElapsed, setZoneSecondsElapsed] = useState<number>(0);
   const [zoneDismissedId, setZoneDismissedId] = useState<string | null>(null);
   const lastWarnedRadarIdRef = useRef<string | null>(null);
+  const lastWarnedPoliceIdRef = useRef<string | null>(null);
 
   // Proximity Radar / Pardal tracking (< 450m)
   const nearbyRadar = occurrences.find(o =>
@@ -167,6 +173,32 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       }
     }
   }, [nearbyRadar?.id, user.enableVoiceInstructions]);
+
+  // Proximity Police Patrol or Blitz Lei Seca tracking (< 500m on road)
+  const nearbyPoliceOrBlitz = occurrences.find(o =>
+    (o.category === 'blitz' || o.category === 'policiamento_ativo' || o.title.toLowerCase().includes('blitz') || o.title.toLowerCase().includes('lei seca') || o.title.toLowerCase().includes('polícia')) &&
+    calcDistanceMeters(currentLocation, o.coordinates) <= 500
+  );
+  const policeDistance = nearbyPoliceOrBlitz ? Math.round(calcDistanceMeters(currentLocation, nearbyPoliceOrBlitz.coordinates)) : 0;
+
+  // Spoken voice advisory when entering police patrol or Lei Seca proximity
+  useEffect(() => {
+    if (nearbyPoliceOrBlitz && nearbyPoliceOrBlitz.id !== lastWarnedPoliceIdRef.current) {
+      lastWarnedPoliceIdRef.current = nearbyPoliceOrBlitz.id;
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window && user.enableVoiceInstructions) {
+        try {
+          window.speechSynthesis.cancel();
+          const dist = Math.round(calcDistanceMeters(currentLocation, nearbyPoliceOrBlitz.coordinates));
+          const isLeiSeca = nearbyPoliceOrBlitz.category === 'blitz' || nearbyPoliceOrBlitz.title.toLowerCase().includes('lei seca');
+          const term = isLeiSeca ? 'Operação Lei Seca' : 'Patrulhamento policial na pista';
+          const msg = new SpeechSynthesisUtterance(`Atenção: ${term} reportado à frente a cerca de ${dist} metros.`);
+          msg.lang = 'pt-BR';
+          msg.rate = 1.05;
+          window.speechSynthesis.speak(msg);
+        } catch {}
+      }
+    }
+  }, [nearbyPoliceOrBlitz?.id, user.enableVoiceInstructions]);
 
   // Professional Ultra-Detailed Cartography (100% Google Maps official road network with all street names & places)
   const getLayerConfig = (layer: MapLayerType) => {
@@ -245,35 +277,75 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     tileLayerRef.current = newTile;
   };
 
-  // Monitor Real-Time GPS Entry into Community / Extreme Risk Zones in Rio de Janeiro
+  // Monitor Real-Time GPS Entry into Community / Extreme Risk Zones in Rio de Janeiro (~300m approaching + inside)
   useEffect(() => {
-    const nearbyCommunity = RIO_COMMUNITY_ZONES.find(zone => {
+    let approachingFound: { zone: RioCommunityRiskZone; distanceMeters: number } | null = null;
+    let insideFound: RioCommunityRiskZone | null = null;
+
+    for (const zone of RIO_COMMUNITY_ZONES) {
       const dist = calcDistanceMeters(currentLocation, zone.coordinates);
-      return dist <= zone.radiusMeters;
-    });
+      const distToBoundary = dist - zone.radiusMeters;
 
-    if (nearbyCommunity && nearbyCommunity.id !== dismissedCommunityId) {
-      setActiveCommunityZone(prev => {
-        if (prev?.id !== nearbyCommunity.id) {
-          setCommunitySecondsElapsed(0);
+      if (distToBoundary <= 0) {
+        insideFound = zone;
+        break;
+      } else if (distToBoundary <= 300) {
+        if (!approachingFound || distToBoundary < approachingFound.distanceMeters) {
+          approachingFound = { zone, distanceMeters: Math.round(distToBoundary) };
         }
-        return nearbyCommunity;
-      });
+      }
+    }
 
-      // Voice advisory alert when entering community area
-      if (nearbyCommunity.id !== lastAnnouncedCommunityIdRef.current) {
-        lastAnnouncedCommunityIdRef.current = nearbyCommunity.id;
-        if (typeof window !== 'undefined' && 'speechSynthesis' in window && user.enableVoiceInstructions) {
-          try {
-            window.speechSynthesis.cancel();
-            const msg = new SpeechSynthesisUtterance(
-              `Atenção: você está passando pela comunidade ${nearbyCommunity.name}. Área de extremo risco. Mantenha os vidros fechados, faróis baixos e velocidade moderada.`
-            );
-            msg.lang = 'pt-BR';
-            msg.rate = 1.05;
-            window.speechSynthesis.speak(msg);
-          } catch {}
+    if (insideFound) {
+      setApproachingCommunityZone(null);
+      if (insideFound.id !== dismissedCommunityId) {
+        setActiveCommunityZone(prev => {
+          if (prev?.id !== insideFound!.id) {
+            setCommunitySecondsElapsed(0);
+          }
+          return insideFound;
+        });
+
+        // Voice advisory alert when entering community area
+        if (insideFound.id !== lastAnnouncedCommunityIdRef.current) {
+          lastAnnouncedCommunityIdRef.current = insideFound.id;
+          if (typeof window !== 'undefined' && 'speechSynthesis' in window && user.enableVoiceInstructions) {
+            try {
+              window.speechSynthesis.cancel();
+              const msg = new SpeechSynthesisUtterance(
+                `Atenção: você está passando pela comunidade ${insideFound.name}. Área de extremo risco. Mantenha os vidros fechados, faróis baixos e velocidade moderada.`
+              );
+              msg.lang = 'pt-BR';
+              msg.rate = 1.05;
+              window.speechSynthesis.speak(msg);
+            } catch {}
+          }
         }
+      }
+    } else if (approachingFound) {
+      setActiveCommunityZone(null);
+      setCommunitySecondsElapsed(0);
+
+      if (approachingFound.zone.id !== dismissedCommunityId) {
+        setApproachingCommunityZone(approachingFound);
+
+        // Voice advisory warning at ~300 meters: "se não estiver na rota planejada, não adentre"
+        if (approachingFound.zone.id !== lastAnnouncedApproachingIdRef.current) {
+          lastAnnouncedApproachingIdRef.current = approachingFound.zone.id;
+          if (typeof window !== 'undefined' && 'speechSynthesis' in window && user.enableVoiceInstructions) {
+            try {
+              window.speechSynthesis.cancel();
+              const msg = new SpeechSynthesisUtterance(
+                `Atenção motorista: aproximação de área de risco a trezentos metros em ${approachingFound.zone.name}. Se este local não estiver na sua rota planejada, não adentre e mantenha-se na via principal expressa com vidros levantados e luz baixa.`
+              );
+              msg.lang = 'pt-BR';
+              msg.rate = 1.05;
+              window.speechSynthesis.speak(msg);
+            } catch {}
+          }
+        }
+      } else {
+        setApproachingCommunityZone(null);
       }
     } else {
       if (activeCommunityZone && lastAnnouncedCommunityIdRef.current === activeCommunityZone.id) {
@@ -289,6 +361,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         lastAnnouncedCommunityIdRef.current = null;
       }
       setActiveCommunityZone(null);
+      setApproachingCommunityZone(null);
       setCommunitySecondsElapsed(0);
     }
   }, [currentLocation.lat, currentLocation.lng, dismissedCommunityId, user.enableVoiceInstructions, activeCommunityZone]);
@@ -636,14 +709,14 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       let shortLabel = 'Alerta';
       let isNightPriority = false;
 
-      if (occ.category === 'blitz') {
+      if (occ.category === 'blitz' || occ.title.toLowerCase().includes('blitz') || occ.title.toLowerCase().includes('lei seca')) {
         badgeBg = '#0284c7';
-        badgeEmoji = '👮';
-        shortLabel = 'Blitz Policial';
-      } else if (occ.category === 'policiamento_ativo') {
-        badgeBg = '#2563eb';
+        badgeEmoji = '🛑';
+        shortLabel = 'Operação Lei Seca';
+      } else if (occ.category === 'policiamento_ativo' || occ.title.toLowerCase().includes('viatura') || occ.title.toLowerCase().includes('polícia')) {
+        badgeBg = '#1d4ed8';
         badgeEmoji = '🚓';
-        shortLabel = 'Policiamento';
+        shortLabel = 'Policiamento na Pista';
       } else if (occ.category === 'radar') {
         badgeBg = '#dc2626';
         badgeEmoji = '📸';
@@ -778,27 +851,62 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     });
   }, [cultureSpots, onSelectCultureSpot]);
 
-  // Render Active Community Safety Perimeter ONLY when approaching / passing through (leaves cartography 100% clean)
+  // Render Active Community Safety Perimeter ONLY when approaching (~300m) or passing through (leaves cartography 100% clean)
   useEffect(() => {
     if (!mapRef.current || !communityLayerGroupRef.current) return;
     const group = communityLayerGroupRef.current;
     group.clearLayers();
 
-    if (!activeCommunityZone) return;
+    const targetZone = activeCommunityZone || approachingCommunityZone?.zone;
+    if (!targetZone) return;
 
-    // Safety perimeter circle only for the community zone being traversed
-    const circle = L.circle([activeCommunityZone.coordinates.lat, activeCommunityZone.coordinates.lng], {
-      radius: activeCommunityZone.radiusMeters,
+    // Safety perimeter circle only for the community zone being approached (~300m) or traversed
+    const circle = L.circle([targetZone.coordinates.lat, targetZone.coordinates.lng], {
+      radius: targetZone.radiusMeters,
       color: '#dc2626',
-      weight: 2.5,
+      weight: 3,
       dashArray: '6, 6',
-      opacity: 0.9,
+      opacity: 0.95,
       fillColor: '#991b1b',
-      fillOpacity: 0.16,
+      fillOpacity: 0.18,
     });
 
+    const labelText = activeCommunityZone 
+      ? '🚨 ÁREA DE RISCO ATIVA' 
+      : `⚠️ RISCO A ~${approachingCommunityZone?.distanceMeters || 300}M - NÃO ADENTRE`;
+
+    const iconHtml = `
+      <div class="relative flex items-center justify-center cursor-pointer group">
+        <div class="px-2.5 py-1 rounded-full bg-red-600 border-2 border-white text-white font-black text-[9.5px] shadow-2xl flex items-center gap-1.5 animate-pulse whitespace-nowrap">
+          <span>🛑</span>
+          <span>${labelText}</span>
+        </div>
+      </div>
+    `;
+
+    const warningBadgeIcon = L.divIcon({
+      className: 'tp-community-danger-marker',
+      html: iconHtml,
+      iconSize: [160, 28],
+      iconAnchor: [80, 14],
+    });
+
+    const marker = L.marker([targetZone.coordinates.lat, targetZone.coordinates.lng], {
+      icon: warningBadgeIcon,
+      zIndexOffset: 650,
+    });
+
+    marker.bindTooltip(`
+      <div class="text-xs p-1.5 font-semibold text-slate-900 max-w-[240px]">
+        <div class="font-black text-red-600 flex items-center gap-1">🚨 ${targetZone.name}</div>
+        <div class="text-[10px] text-slate-700 font-bold mt-0.5">${targetZone.complexName} (${targetZone.neighborhood})</div>
+        <div class="text-[9.5px] text-amber-800 font-bold mt-1">🛑 ${targetZone.advice}</div>
+      </div>
+    `, { direction: 'top', offset: [0, -12] });
+
     group.addLayer(circle);
-  }, [activeCommunityZone]);
+    group.addLayer(marker);
+  }, [activeCommunityZone, approachingCommunityZone]);
 
   // Filter places based on activeMapCategory
   const matchPlaceCategory = (place: Place, cat: string): boolean => {
@@ -1150,6 +1258,80 @@ export const GPSMap: React.FC<GPSMapProps> = ({
             </div>
           )}
 
+          {/* Proximity Police Patrol or Blitz Lei Seca Alert Banner (< 500m on road) */}
+          {nearbyPoliceOrBlitz && (
+            <div className="pointer-events-auto max-w-lg w-full bg-slate-950/98 border-2 border-blue-500 rounded-2xl p-2.5 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-3 duration-300">
+              <div className="flex items-center justify-between gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 border-2 border-white flex items-center justify-center text-white shrink-0 shadow-lg animate-pulse">
+                  <span className="text-base">
+                    {nearbyPoliceOrBlitz.category === 'blitz' || nearbyPoliceOrBlitz.title.toLowerCase().includes('lei seca') ? '🛑' : '🚓'}
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[9px] uppercase tracking-wider flex items-center gap-1 shadow">
+                      {nearbyPoliceOrBlitz.category === 'blitz' || nearbyPoliceOrBlitz.title.toLowerCase().includes('lei seca')
+                        ? '🛑 OPERAÇÃO LEI SECA / BAFÔMETRO'
+                        : '🚓 PATRULHAMENTO NA PISTA • POLÍCIA'}
+                    </span>
+                    <span className="text-xs font-black text-cyan-300 font-mono">
+                      A ~{policeDistance} METROS
+                    </span>
+                  </div>
+                  <div className="text-xs font-black text-white truncate mt-0.5">
+                    {nearbyPoliceOrBlitz.title}
+                  </div>
+                  <div className="text-[10px] text-slate-300 truncate">
+                    📍 {nearbyPoliceOrBlitz.locationName} • Fiscalização / patrulhamento ativo na via
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedMapOccurrence(nearbyPoliceOrBlitz);
+                    setSelectedMapPlace(null);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-[11px] shrink-0 shadow transition-all"
+                >
+                  Ver no Mapa
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Approaching Community Risk Zone Alert (~300m Warning to Avoid Entering if not on route) */}
+          {approachingCommunityZone && !activeCommunityZone && approachingCommunityZone.zone.id !== dismissedCommunityId && (
+            <div className="pointer-events-auto max-w-lg w-full bg-gradient-to-r from-amber-950/98 via-red-950/98 to-slate-950/98 border-2 border-amber-500 rounded-2xl p-3 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-4 duration-300">
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-500 border-2 border-white flex items-center justify-center text-slate-950 shrink-0 shadow-lg animate-bounce">
+                  <ShieldAlert className="w-5 h-5 text-slate-950" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-wider">
+                      ⚠️ APROXIMAÇÃO DE ÁREA DE RISCO A ~{approachingCommunityZone.distanceMeters}M
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-300">
+                      {approachingCommunityZone.zone.neighborhood}
+                    </span>
+                  </div>
+                  <div className="text-xs font-black text-white truncate mt-1">
+                    {approachingCommunityZone.zone.name} ({approachingCommunityZone.zone.complexName})
+                  </div>
+                  <div className="text-[10.5px] text-amber-200 mt-1 leading-snug font-bold bg-red-950/80 p-2 rounded-xl border border-red-500/50">
+                    🛑 ATENÇÃO: NÃO ADENTRE NESTE LOCAL SE NÃO FOR SEU DESTINO! Permaneça na via principal expressa da sua rota com vidros levantados e luz baixa.
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDismissedCommunityId(approachingCommunityZone.zone.id)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900"
+                  title="Ocultar aviso"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Active Community Zone Entry Alert & Live Traversal Timer */}
           {activeCommunityZone && (
             <div className="pointer-events-auto max-w-lg w-full bg-gradient-to-r from-red-950/98 via-rose-950/98 to-slate-950/98 border-2 border-red-500 rounded-2xl p-3 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-4 duration-300">
@@ -1250,25 +1432,51 @@ export const GPSMap: React.FC<GPSMapProps> = ({
           )}
 
           {/* Quick Prompt when User Taps a Point on the Map */}
-          {tappedMapCoords && onOpenPhotoIncident && (
-            <div className="pointer-events-auto max-w-sm bg-slate-950/95 border border-lime-400/70 rounded-xl px-3 py-2 shadow-xl flex items-center justify-between gap-2">
+          {tappedMapCoords && (
+            <div className="pointer-events-auto max-w-md bg-slate-950/98 border border-lime-400/80 rounded-2xl p-2.5 shadow-2xl flex items-center justify-between gap-2.5 backdrop-blur-md">
               <div className="text-[10px] text-slate-200 min-w-0">
-                <span className="font-black text-lime-400 block">📍 Ponto Selecionado no Mapa</span>
-                <span className="font-mono text-slate-400">
+                <span className="font-black text-lime-400 flex items-center gap-1">
+                  <span>📍</span>
+                  <span>Ponto Demarcado no Mapa</span>
+                </span>
+                <span className="font-mono text-slate-300 text-[9.5px] block truncate">
                   {tappedMapCoords.lat.toFixed(5)}, {tappedMapCoords.lng.toFixed(5)}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
-                  onClick={() => onOpenPhotoIncident(tappedMapCoords)}
-                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 text-white font-black text-[10px] flex items-center gap-1 shadow"
+                  onClick={() => {
+                    if (onSelectPlace) {
+                      onSelectPlace({
+                        id: `pinned-${Date.now()}`,
+                        name: 'Ponto Demarcado no Mapa',
+                        category: 'comercio_servicos',
+                        subCategory: 'Destino Marcado',
+                        address: `${tappedMapCoords.lat.toFixed(5)}, ${tappedMapCoords.lng.toFixed(5)}`,
+                        coordinates: tappedMapCoords,
+                        source: 'community',
+                        dataOrigin: 'reported',
+                      });
+                    }
+                    setTappedMapCoords(null);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-black text-[10px] flex items-center gap-1 shadow transition-all active:scale-95"
                 >
-                  <Camera className="w-3 h-3" />
-                  <span>Marcar + Foto Aqui</span>
+                  <Navigation className="w-3 h-3" />
+                  <span>Traçar Rota</span>
                 </button>
+                {onOpenPhotoIncident && (
+                  <button
+                    onClick={() => onOpenPhotoIncident(tappedMapCoords)}
+                    className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-black text-[10px] flex items-center gap-1 shadow transition-all active:scale-95"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>Foto / Relato</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setTappedMapCoords(null)}
-                  className="p-1 text-slate-400 hover:text-white"
+                  className="p-1 text-slate-400 hover:text-white rounded-lg bg-slate-900"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -1368,10 +1576,10 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         </div>
       )}
 
-      {/* Floating Selected Establishment Card (Real Photo + Star Rating + Verified Reference Point + Route Action) */}
+      {/* Google Maps & Waze Style Floating Place Chip / Sheet with Real Photo & Quick Actions */}
       {selectedMapPlace && !isNavigating && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] sm:w-[410px] z-40 bg-slate-950/95 border border-cyan-500/50 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="relative h-32 w-full bg-slate-900 overflow-hidden">
+        <div className="absolute bottom-4 sm:top-16 left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] sm:w-[420px] max-h-[85vh] overflow-y-auto z-40 bg-slate-950/98 border border-cyan-500/50 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 sm:slide-in-from-top-2 duration-200">
+          <div className="relative h-36 w-full bg-slate-900 overflow-hidden">
             {selectedMapPlace.photoUrl ? (
               <img
                 src={selectedMapPlace.photoUrl}
@@ -1388,24 +1596,29 @@ export const GPSMap: React.FC<GPSMapProps> = ({
             {/* Close Card Button */}
             <button
               onClick={() => setSelectedMapPlace(null)}
-              className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-950/80 hover:bg-slate-900 text-white border border-slate-700"
+              className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-950/80 hover:bg-slate-900 text-white border border-slate-700 shadow"
               title="Fechar cartão"
             >
               <X className="w-4 h-4" />
             </button>
 
-            {/* Star Rating Pill */}
-            {selectedMapPlace.rating !== undefined && (
-              <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-slate-950/90 border border-amber-500/40 flex items-center gap-1 text-[11px] font-black text-amber-400 shadow-lg">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                <span>{selectedMapPlace.rating.toFixed(1)}</span>
-                {selectedMapPlace.ratingCount !== undefined && (
-                  <span className="text-[9px] text-slate-300 font-semibold">
-                    ({selectedMapPlace.ratingCount.toLocaleString('pt-BR')} avaliações)
-                  </span>
-                )}
-              </div>
-            )}
+            {/* Badges: Photo Verified + Star Rating Pill */}
+            <div className="absolute top-2 left-2 flex items-center gap-1.5 flex-wrap">
+              <span className="px-2 py-0.5 rounded-lg bg-slate-950/90 border border-cyan-400/50 text-[10px] font-black text-cyan-300 shadow">
+                📸 Foto Real
+              </span>
+              {selectedMapPlace.rating !== undefined && (
+                <div className="px-2 py-0.5 rounded-lg bg-slate-950/90 border border-amber-500/40 flex items-center gap-1 text-[11px] font-black text-amber-400 shadow-lg">
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                  <span>{selectedMapPlace.rating.toFixed(1)}</span>
+                  {selectedMapPlace.ratingCount !== undefined && (
+                    <span className="text-[9px] text-slate-300 font-semibold">
+                      ({selectedMapPlace.ratingCount.toLocaleString('pt-BR')})
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="absolute bottom-2 left-3 right-3">
               <div className="text-sm font-black text-white leading-tight line-clamp-1">
@@ -1421,12 +1634,26 @@ export const GPSMap: React.FC<GPSMapProps> = ({
           </div>
 
           <div className="p-3 space-y-2">
-            <div className="text-[11px] text-slate-300 flex items-start gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
-              <span>
-                {selectedMapPlace.address}
-                {selectedMapPlace.neighborhood ? ` — ${selectedMapPlace.neighborhood}` : ''}
-              </span>
+            <div className="text-[11px] text-slate-300 flex items-start justify-between gap-1.5">
+              <div className="flex items-start gap-1.5 min-w-0">
+                <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                <span>
+                  {selectedMapPlace.address}
+                  {selectedMapPlace.neighborhood ? ` — ${selectedMapPlace.neighborhood}` : ''}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                    navigator.clipboard.writeText(`${selectedMapPlace.name}, ${selectedMapPlace.address}`);
+                    alert('Endereço copiado para a área de transferência!');
+                  }
+                }}
+                className="shrink-0 text-[10px] text-cyan-400 hover:text-cyan-300 font-bold"
+                title="Copiar endereço"
+              >
+                Copiar
+              </button>
             </div>
 
             {selectedMapPlace.verifiedReferencePoint && (
@@ -1452,12 +1679,12 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 className="w-full py-2.5 px-3 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition-all"
               >
                 <Navigation className="w-3.5 h-3.5" />
-                <span>Traçar Rota Agora no Tô Passando</span>
+                <span>Traçar Rota no Tô Passando</span>
               </button>
             </div>
 
-            {selectedMapPlace.phone && (
-              <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[10px] text-slate-400">
+            <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[10px] text-slate-400">
+              {selectedMapPlace.phone ? (
                 <a
                   href={`tel:${selectedMapPlace.phone.replace(/[^\d+]/g, '')}`}
                   className="text-emerald-400 hover:underline font-bold flex items-center gap-1"
@@ -1465,16 +1692,18 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                   <Phone className="w-3 h-3" />
                   <span>Ligar: {selectedMapPlace.phone}</span>
                 </a>
-                {onOpenPlacesPanel && (
-                  <button
-                    onClick={onOpenPlacesPanel}
-                    className="text-cyan-400 hover:underline font-bold"
-                  >
-                    Ver todos os locais →
-                  </button>
-                )}
-              </div>
-            )}
+              ) : (
+                <span className="text-slate-500">Local Verificado</span>
+              )}
+              {onOpenPlacesPanel && (
+                <button
+                  onClick={onOpenPlacesPanel}
+                  className="text-cyan-400 hover:underline font-bold"
+                >
+                  Ver todos os locais →
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
