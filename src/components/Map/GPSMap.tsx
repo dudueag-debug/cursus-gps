@@ -104,6 +104,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   const cultureLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const placesLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const communityLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const isUserDraggingMapRef = useRef<boolean>(false);
 
   // Automatic Night Mode detection when dusk arrives (18:00 to 05:59)
   const isNightHourNow = () => {
@@ -415,6 +416,11 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         } catch {}
       });
 
+      // Track user manual panning so map doesn't fight finger/mouse when exploring
+      map.on('dragstart', () => {
+        isUserDraggingMapRef.current = true;
+      });
+
       mapRef.current = map;
 
       // Force recalculation of container size to prevent offset box
@@ -485,12 +491,19 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     }
   }, [activePanel]);
 
-  // Recenter map when currentLocation changes substantially (e.g. initial online detection)
+  // Recenter / follow vehicle smoothly in real time
   useEffect(() => {
     if (!mapRef.current) return;
-    // Animate smoothly to new location if not currently in user drag
-    mapRef.current.panTo([currentLocation.lat, currentLocation.lng], { animate: true, duration: 1.2 });
-  }, [currentLocation.lat, currentLocation.lng]);
+    if (isNavigating) {
+      // Forward perspective camera offset so driver sees upcoming roads and intersections
+      const rad = (heading * Math.PI) / 180;
+      const forwardLat = Math.cos(rad) * 0.0016;
+      const forwardLng = Math.sin(rad) * 0.0016;
+      mapRef.current.panTo([currentLocation.lat + forwardLat, currentLocation.lng + forwardLng], { animate: true, duration: 0.8 });
+    } else if (!isUserDraggingMapRef.current) {
+      mapRef.current.panTo([currentLocation.lat, currentLocation.lng], { animate: true, duration: 1.0 });
+    }
+  }, [currentLocation.lat, currentLocation.lng, isNavigating, heading]);
 
   // Update Vehicle Marker Position, Icon, GPS Accuracy Pulse Ring, and Heading
   useEffect(() => {
@@ -521,14 +534,6 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     } else {
       accuracyCircleRef.current.setLatLng([currentLocation.lat, currentLocation.lng]);
       accuracyCircleRef.current.setRadius(accuracyRadius);
-    }
-
-    if (isNavigating) {
-      // Forward perspective camera offset so driver sees upcoming roads and intersections
-      const rad = (heading * Math.PI) / 180;
-      const forwardLat = Math.cos(rad) * 0.0016;
-      const forwardLng = Math.sin(rad) * 0.0016;
-      mapRef.current.panTo([currentLocation.lat + forwardLat, currentLocation.lng + forwardLng], { animate: true, duration: 0.8 });
     }
   }, [currentLocation, heading, user.vehicleModel, user.vehicleColor, user.enableWindEffect, isNavigating, gpsAccuracy]);
 
@@ -1088,6 +1093,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
   // Center on Vehicle
   const handleRecenter = () => {
+    isUserDraggingMapRef.current = false;
     if (mapRef.current) {
       mapRef.current.setView([currentLocation.lat, currentLocation.lng], 16, { animate: true });
     }
@@ -1122,10 +1128,10 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         />
       </div>
 
-      {/* Top Floating Bar: Tô Passando Nesse Momento + Marcar Foto + Fica Atento + Commerce Chips */}
+      {/* Top Floating Bar: Centered Category Chips & Aligned Safety Alerts */}
       {!isNavigating && (
-        <div className="absolute top-2.5 left-2.5 right-16 z-30 flex flex-col gap-1.5 pointer-events-none">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto pb-1">
+        <div className="absolute top-2 inset-x-0 z-30 flex flex-col items-center gap-1.5 pointer-events-none px-2 sm:px-14">
+          <div className="flex items-center justify-start sm:justify-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto max-w-full pb-1">
             <button
               onClick={handleRecenter}
               className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-[11px] shadow-xl border border-cyan-300 active:scale-95 transition-all"
@@ -1375,7 +1381,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
       {/* Floating Selected Occurrence / Risk Zone Card (Shows User Photo, Colored Risk Badge, Speed Limit & Timer) */}
       {selectedMapOccurrence && !isNavigating && (
-        <div className="absolute top-14 left-3 right-16 sm:right-auto sm:w-[390px] z-30 bg-slate-950/95 border-2 border-rose-500/70 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] sm:w-[410px] z-40 bg-slate-950/95 border-2 border-rose-500/70 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
           {selectedMapOccurrence.photoUrl && (
             <div className="relative h-36 w-full bg-slate-900 overflow-hidden">
               <img
@@ -1465,7 +1471,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
       {/* Floating Selected Establishment Card (Real Photo + Star Rating + Verified Reference Point + Route Action) */}
       {selectedMapPlace && !isNavigating && (
-        <div className="absolute top-14 left-3 right-16 sm:right-auto sm:w-[390px] z-30 bg-slate-950/95 border border-cyan-500/50 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] sm:w-[410px] z-40 bg-slate-950/95 border border-cyan-500/50 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="relative h-32 w-full bg-slate-900 overflow-hidden">
             {selectedMapPlace.photoUrl ? (
               <img
@@ -1737,7 +1743,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       </div>
 
       {/* Technological Cockpit Telemetry HUD Widget (Speedometer + Regulatory Speed Limit Sign + Gyro Compass Rose + RTK Precision) */}
-      <div className="absolute bottom-24 sm:bottom-6 left-3 z-20 flex flex-col gap-2 pointer-events-auto select-none">
+      <div className="absolute bottom-20 sm:bottom-4 left-3 z-20 flex flex-col gap-1.5 pointer-events-auto select-none">
         {/* Upper Telemetry Bar: Speedometer + Regulatory Speed Limit Sign + Gyro Compass */}
         <div className="flex items-center gap-2 bg-slate-950/90 backdrop-blur-xl border border-cyan-500/40 rounded-2xl p-2 shadow-2xl shadow-black/80">
           {/* Digital Speedometer Gauge */}

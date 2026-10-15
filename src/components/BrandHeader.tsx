@@ -240,9 +240,9 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
         </div>
       </div>
 
-      {/* Row 2: Dedicated Navigation Tab Bar (Mapa Ao Vivo | Comércios Todo o RJ | Tempo Real | Baixar App PWA iOS & Android | Rotas) */}
-      <div className="max-w-7xl w-full mx-auto flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar pt-1 border-t border-slate-800/70">
-        <div className="flex items-center gap-1.5">
+      {/* Row 2: Dedicated Navigation Tab Bar (Centralized & Perfectly Balanced) */}
+      <div className="max-w-7xl w-full mx-auto flex items-center justify-between sm:justify-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar pt-1 pb-0.5 border-t border-slate-800/70">
+        <div className="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 shrink-0">
           {/* Tab 1: Mapa Ao Vivo */}
           <button
             onClick={() => setActivePanel('map')}
@@ -266,7 +266,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
             }`}
           >
             <Store className="w-3.5 h-3.5" />
-            <span>🏪 Comércios Todo o RJ (Todos os Bairros)</span>
+            <span>🏪 Comércios Todo o RJ</span>
           </button>
 
           {/* Tab 3: Tudo que Acontece em Tempo Real */}
@@ -288,7 +288,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black whitespace-nowrap transition-all bg-lime-400/15 hover:bg-lime-400/25 text-lime-300 border border-lime-400/50 shadow-sm"
           >
             <Download className="w-3.5 h-3.5 text-lime-400" />
-            <span>📲 Baixar App no Telefone (PWA iOS & Android)</span>
+            <span>📲 Baixar App (PWA iOS/Android)</span>
           </button>
 
           {/* Tab 5: Traçar Rota */}

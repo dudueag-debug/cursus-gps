@@ -49,13 +49,22 @@ export class OSRMProvider implements IRoutingProvider {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
       const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
       
-      const res = await fetch(osrmUrl, { signal: controller.signal });
+      let res: Response | null = null;
+      try {
+        res = await fetch(osrmUrl, { signal: controller.signal });
+      } catch {
+        // Try backup mirror if primary demo is unreachable
+        try {
+          const mirrorUrl = `https://routing.openstreetmap.de/routed-${profile === 'foot' ? 'foot' : profile === 'bike' ? 'bike' : 'car'}/route/v1/${profile}/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+          res = await fetch(mirrorUrl);
+        } catch {}
+      }
       clearTimeout(timeoutId);
 
-      if (!res.ok) return null;
+      if (!res || !res.ok) return null;
       const data = await res.json();
       if (data.code !== 'Ok' || !Array.isArray(data.routes) || data.routes.length === 0) {
         return null;

@@ -477,6 +477,21 @@ export function App() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Real-time Event Listeners for local & broadcast occurrence additions & status updates
+    const handleOccurrenceAdded = () => {
+      api.getOccurrences(currentLocation).then(setOccurrences).catch(console.error);
+    };
+    const handleOccurrenceUpdated = () => {
+      api.getOccurrences(currentLocation).then(setOccurrences).catch(console.error);
+    };
+    window.addEventListener('tp_occurrence_added', handleOccurrenceAdded);
+    window.addEventListener('tp_occurrence_updated', handleOccurrenceUpdated);
+
+    // Periodic live sync to purge expired occurrences automatically (every 20s)
+    const occSyncInterval = setInterval(() => {
+      api.getOccurrences(currentLocation).then(setOccurrences).catch(console.error);
+    }, 20000);
+
     // Supabase Realtime Spatial Listener
     const unsubscribeRealtime = supabaseService.subscribeToIncidents(currentLocation, event => {
       setRealtimeToast({
@@ -491,6 +506,9 @@ export function App() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('tp_occurrence_added', handleOccurrenceAdded);
+      window.removeEventListener('tp_occurrence_updated', handleOccurrenceUpdated);
+      clearInterval(occSyncInterval);
       unsubscribeRealtime();
       if (handleOrientation) {
         window.removeEventListener('deviceorientation', handleOrientation);

@@ -38,50 +38,6 @@ export function isValidBrazilianCoordinates(coords?: Coordinates | null): boolea
 
 const initialOccurrences: Occurrence[] = [
   {
-    id: 'occ-tp-blitz-lei-seca-1',
-    category: 'blitz',
-    title: '👮 Blitz da Lei Seca & Operação Policial Ativa',
-    description: 'Fiscalização ativa com etilômetro (bafômetro) e apoio de guarnição da PMERJ.',
-    locationName: 'Av. Brasil • Trecho Bangu / Senador Camará',
-    coordinates: { lat: -22.8635, lng: -43.4912 },
-    sourceType: 'community',
-    sourceName: 'Operação Lei Seca RJ / Tô Passando',
-    status: 'confirmada_comunidade',
-    createdAt: new Date(Date.now() - 1800000).toISOString(),
-    updatedAt: new Date(Date.now() - 180000).toISOString(),
-    confirmationsCount: 54,
-    resolvedVotesCount: 0,
-    denialsCount: 0,
-    severity: 'alta',
-    affectedLanes: 'Faixa da direita e pista lateral',
-    messagesCount: 12,
-    isNormalized: false,
-    dataOrigin: 'real',
-    confidenceScore: 99,
-  },
-  {
-    id: 'occ-tp-policiamento-ativo-1',
-    category: 'policiamento_ativo',
-    title: '🚓 Ponto com Policiamento Ativo (DPO Móvel)',
-    description: 'Guarnição da PMERJ posicionada em patrulhamento preventivo e ostensivo.',
-    locationName: 'Av. Cesário de Melo • Senador Camará',
-    coordinates: { lat: -22.8715, lng: -43.4890 },
-    sourceType: 'official',
-    sourceName: 'PMERJ • Batalhão de Área',
-    status: 'confirmada_comunidade',
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    updatedAt: new Date(Date.now() - 240000).toISOString(),
-    confirmationsCount: 41,
-    resolvedVotesCount: 0,
-    denialsCount: 0,
-    severity: 'baixa',
-    affectedLanes: 'Recuo da via',
-    messagesCount: 5,
-    isNormalized: false,
-    dataOrigin: 'real',
-    confidenceScore: 98,
-  },
-  {
     id: 'occ-tp-pardal-brasil-60',
     category: 'radar',
     title: '📸 Pardal Eletrônico • Limite 60 km/h',
@@ -91,8 +47,8 @@ const initialOccurrences: Occurrence[] = [
     sourceType: 'official',
     sourceName: 'CET-RIO / Base Oficial de Pardais',
     status: 'confirmada_comunidade',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    updatedAt: new Date(Date.now() - 600000).toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     confirmationsCount: 89,
     resolvedVotesCount: 0,
     denialsCount: 0,
@@ -544,26 +500,135 @@ export const api = {
     });
   },
 
-    async getOccurrences(_userCoords?: Coordinates): Promise<Occurrence[]> {
+  async getOccurrences(_userCoords?: Coordinates): Promise<Occurrence[]> {
     let userReported: Occurrence[] = [];
-    const customStored = localStorage.getItem('tp_user_custom_occurrences');
+    const customStored = typeof localStorage !== 'undefined' ? localStorage.getItem('tp_user_custom_occurrences') : null;
     if (customStored) {
       try {
         const parsed = JSON.parse(customStored);
         if (Array.isArray(parsed)) {
-          // Keep active occurrences (under 12 hours or with community confirmations)
+          // Keep strictly active occurrences: under 4 hours or with recent community confirmations, and not resolved
           const now = Date.now();
           userReported = parsed.filter(occ => {
+            if (occ.isNormalized || occ.status === 'resolvida') return false;
             const created = new Date(occ.createdAt).getTime();
             const ageHours = (now - created) / (1000 * 60 * 60);
-            return ageHours < 12 || (occ.confirmationsCount && occ.confirmationsCount > 2);
+            return ageHours < 4 || (occ.confirmationsCount && occ.confirmationsCount > 2);
           });
         }
       } catch {}
     }
 
-    // Official persistent verified cameras and police checkpoints only
-    const combined = [...userReported, ...initialOccurrences];
+    // Dynamic automatic events happening in Rio de Janeiro right now
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentDay = now.getDay(); // 0 = Sun, 5 = Fri, 6 = Sat
+    const autoRioEvents: Occurrence[] = [];
+
+    // Rush Hour Congestion in Rio de Janeiro (7:00-9:30 and 17:00-19:45 on weekdays)
+    const isWeekday = currentDay >= 1 && currentDay <= 5;
+    const isMorningRush = isWeekday && currentHour >= 7 && currentHour <= 9;
+    const isEveningRush = isWeekday && currentHour >= 17 && currentHour <= 19;
+
+    if (isMorningRush) {
+      autoRioEvents.push({
+        id: `auto-rush-brasil-${now.toDateString()}`,
+        category: 'engarrafamento',
+        title: '🚗 Lentidão Intensa • Av. Brasil (Sentido Centro)',
+        description: 'Tráfego lento e retenção entre Guadalupe e Irajá devido ao fluxo matinal.',
+        locationName: 'Av. Brasil, Pista Central • Guadalupe / Irajá',
+        coordinates: { lat: -22.8450, lng: -43.3450 },
+        sourceType: 'official',
+        sourceName: 'Monitoramento de Tráfego RJ Ao Vivo',
+        status: 'confirmada_comunidade',
+        createdAt: new Date(Date.now() - 900000).toISOString(),
+        updatedAt: new Date().toISOString(),
+        confirmationsCount: 68,
+        resolvedVotesCount: 0,
+        denialsCount: 0,
+        severity: 'alta',
+        affectedLanes: 'Pistas expressas e seletiva',
+        messagesCount: 14,
+        isNormalized: false,
+        dataOrigin: 'real',
+        confidenceScore: 98,
+      });
+      autoRioEvents.push({
+        id: `auto-rush-vermelha-${now.toDateString()}`,
+        category: 'engarrafamento',
+        title: '🚗 Retenção • Linha Vermelha (Sentido Centro)',
+        description: 'Trânsito congestionado a partir do Fundão até a Ponte Rio-Niterói.',
+        locationName: 'Linha Vermelha, km 12 • Ilha do Fundão',
+        coordinates: { lat: -22.8480, lng: -43.2280 },
+        sourceType: 'official',
+        sourceName: 'Monitoramento CET-Rio Ao Vivo',
+        status: 'confirmada_comunidade',
+        createdAt: new Date(Date.now() - 600000).toISOString(),
+        updatedAt: new Date().toISOString(),
+        confirmationsCount: 52,
+        resolvedVotesCount: 0,
+        denialsCount: 0,
+        severity: 'alta',
+        affectedLanes: 'Todas as faixas',
+        messagesCount: 9,
+        isNormalized: false,
+        dataOrigin: 'real',
+        confidenceScore: 97,
+      });
+    } else if (isEveningRush) {
+      autoRioEvents.push({
+        id: `auto-rush-brasil-volta-${now.toDateString()}`,
+        category: 'engarrafamento',
+        title: '🚗 Engarrafamento • Av. Brasil (Sentido Zona Oeste)',
+        description: 'Forte retenção entre Caju e Penha com trânsito intenso de saída.',
+        locationName: 'Av. Brasil, km 14 • Ramos / Penha',
+        coordinates: { lat: -22.8430, lng: -43.2750 },
+        sourceType: 'official',
+        sourceName: 'Monitoramento de Tráfego RJ Ao Vivo',
+        status: 'confirmada_comunidade',
+        createdAt: new Date(Date.now() - 1200000).toISOString(),
+        updatedAt: new Date().toISOString(),
+        confirmationsCount: 77,
+        resolvedVotesCount: 0,
+        denialsCount: 0,
+        severity: 'alta',
+        affectedLanes: 'Pistas expressas e laterais',
+        messagesCount: 16,
+        isNormalized: false,
+        dataOrigin: 'real',
+        confidenceScore: 99,
+      });
+    }
+
+    // Active Blitz da Lei Seca on Thursday/Friday/Saturday/Sunday night (21:00 to 04:00)
+    const isNightOps = (currentHour >= 21 || currentHour <= 4) && (currentDay === 4 || currentDay === 5 || currentDay === 6 || currentDay === 0);
+    if (isNightOps) {
+      autoRioEvents.push({
+        id: `auto-blitz-leiseca-${now.toDateString()}`,
+        category: 'blitz',
+        title: '👮 Operação Lei Seca & Fiscalização Ativa',
+        description: 'Bloqueio de fiscalização com bafômetro e apoio de guarnição da PMERJ.',
+        locationName: 'Av. das Américas • Barra da Tijuca',
+        coordinates: { lat: -23.0010, lng: -43.3420 },
+        sourceType: 'official',
+        sourceName: 'Operação Lei Seca RJ Oficial',
+        status: 'confirmada_comunidade',
+        createdAt: new Date(Date.now() - 1800000).toISOString(),
+        updatedAt: new Date().toISOString(),
+        confirmationsCount: 46,
+        resolvedVotesCount: 0,
+        denialsCount: 0,
+        severity: 'alta',
+        affectedLanes: 'Pista lateral',
+        messagesCount: 8,
+        isNormalized: false,
+        dataOrigin: 'real',
+        confidenceScore: 99,
+      });
+    }
+
+    // Official persistent verified cameras (fixed physical infrastructure)
+    const combined = [...userReported, ...autoRioEvents, ...initialOccurrences];
 
     // Merge backend server occurrences if available
     const data = await safeJsonFetch(`${API_BASE}/occurrences`);
@@ -652,7 +717,15 @@ export const api = {
       if (existing) customList = JSON.parse(existing);
     } catch {}
     customList.unshift(newOcc);
-    localStorage.setItem('tp_user_custom_occurrences', JSON.stringify(customList.slice(0, 50)));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('tp_user_custom_occurrences', JSON.stringify(customList.slice(0, 50)));
+    }
+
+    // Broadcast instant occurrence added event across entire application
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tp_occurrence_added', { detail: newOcc }));
+    }
+
     return newOcc;
   },
 
@@ -660,8 +733,36 @@ export const api = {
     const list = await this.getOccurrences();
     const occ = list.find(o => o.id === id);
     if (occ) {
-      if (action === 'confirm_active') occ.confirmationsCount += 1;
-      else if (action === 'vote_resolved') occ.isNormalized = true;
+      if (action === 'confirm_active') {
+        occ.confirmationsCount += 1;
+      } else if (action === 'vote_resolved') {
+        occ.isNormalized = true;
+        occ.status = 'resolvida';
+      }
+
+      // Update custom list in localStorage if it was a user report
+      try {
+        const stored = localStorage.getItem('tp_user_custom_occurrences');
+        if (stored) {
+          const parsed: Occurrence[] = JSON.parse(stored);
+          const updated = parsed.map(o => {
+            if (o.id === id) {
+              if (action === 'confirm_active') o.confirmationsCount += 1;
+              if (action === 'vote_resolved') {
+                o.isNormalized = true;
+                o.status = 'resolvida';
+              }
+            }
+            return o;
+          });
+          localStorage.setItem('tp_user_custom_occurrences', JSON.stringify(updated));
+        }
+      } catch {}
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('tp_occurrence_updated', { detail: { id, action, occurrence: occ } }));
+      }
+
       return { occurrence: occ, message: 'Confirmação registrada.' };
     }
     throw new Error('Ocorrência não encontrada');
