@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import type { Coordinates, RouteOption, Occurrence, CultureSpot, UserProfile, MapLayerType, Place } from '../../types';
 import { createVehicleDivIcon } from './VehicleMarkerIcon';
-import { Crosshair, ZoomIn, ZoomOut, Eye, Layers, Compass, Box, Map as MapIcon, Globe, Navigation, MapPin, Phone, Star, X, Camera, AlertTriangle, Clock, ShieldAlert, Sparkles } from 'lucide-react';
+import { Crosshair, ZoomIn, ZoomOut, Eye, Layers, Compass, Box, Map as MapIcon, Globe, Navigation, MapPin, Phone, Star, X, Camera, AlertTriangle, Clock, ShieldAlert, Sparkles, Car } from 'lucide-react';
 import { RIO_COMMUNITY_ZONES, type RioCommunityRiskZone } from '../../data/rioCommunityZones';
+import { liveTrafficService, type LiveTrafficState } from '../../services/liveTrafficService';
 
 interface GPSMapProps {
   currentLocation: Coordinates;
@@ -27,6 +28,7 @@ interface GPSMapProps {
   onFindCategory?: (category: any) => void;
   onOpenPlacesPanel?: () => void;
   onOpenWazeLive?: (coords?: Coordinates, label?: string) => void;
+  onOpenGaragem?: () => void;
   isSplashActive?: boolean;
   activePanel?: string;
   gpsAccuracy?: number | null;
@@ -86,6 +88,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   onOpenPhotoIncident,
   onOpenQuickSignals,
   onOpenPlacesPanel,
+  onOpenGaragem,
   isSplashActive = false,
   activePanel = 'map',
   gpsAccuracy = 3,
@@ -126,6 +129,29 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
   const [currentZoom, setCurrentZoom] = useState<number>(15);
   const [isDeclutterActive, setIsDeclutterActive] = useState<boolean>(false);
+
+  // Real-time Traffic Telemetry & Flow Overlay (Requirement 1)
+  const [isTrafficActive, setIsTrafficActive] = useState<boolean>(true);
+  const [trafficState, setTrafficState] = useState<LiveTrafficState>(() => liveTrafficService.getState());
+
+  useEffect(() => {
+    const unsub = liveTrafficService.subscribe(state => {
+      setTrafficState(state);
+    });
+    return unsub;
+  }, []);
+
+  // Continuous shortest angular delta heading smoothing (Requirement 5)
+  const continuousHeadingRef = useRef<number>(heading);
+  useEffect(() => {
+    if (user.accessibility?.reducedMotion) {
+      continuousHeadingRef.current = heading;
+      return;
+    }
+    const prev = continuousHeadingRef.current;
+    const delta = ((heading - prev + 540) % 360) - 180;
+    continuousHeadingRef.current = prev + delta;
+  }, [heading, user.accessibility?.reducedMotion]);
 
   // Active Community Extreme Risk Zone & Live Traversal Timer
   const [activeCommunityZone, setActiveCommunityZone] = useState<RioCommunityRiskZone | null>(null);
@@ -200,12 +226,35 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     }
   }, [nearbyPoliceOrBlitz?.id, user.enableVoiceInstructions]);
 
-  // Professional Ultra-Detailed Cartography (100% Google Maps official road network with all street names & places)
-  const getLayerConfig = (layer: MapLayerType) => {
+  // Helper to build icon for chosen classic car / model with factory colors & simple fallback (Requirement 4 & 5)
+  const getSelectedVehicleIcon = (h: number) => {
+    const activeClassicCarId = user.selectedClassicCarId || (typeof window !== 'undefined' ? localStorage.getItem('tp_selected_car_id') : null) || 'vw-fusca';
+    const activeClassicColorId = user.selectedClassicCarColorId || (typeof window !== 'undefined' ? localStorage.getItem('tp_selected_car_color_id') : null) || undefined;
+    const useSimpleMarker = Boolean(user.useSimpleVehicleMarker || user.accessibility?.reducedMotion);
+
+    return createVehicleDivIcon(
+      user.vehicleModel,
+      user.vehicleColor,
+      h,
+      user.enableWindEffect,
+      isNavigating,
+      {
+        classicCarId: activeClassicCarId,
+        classicColorId: activeClassicColorId,
+        useSimpleMarker,
+        reducedMotion: Boolean(user.accessibility?.reducedMotion),
+      }
+    );
+  };
+
+  // Professional Ultra-Detailed Cartography (100% Google Maps official road network with live traffic tiles)
+  const getLayerConfig = (layer: MapLayerType, withTraffic: boolean = isTrafficActive) => {
     switch (layer) {
       case 'satellite':
         return {
-          url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+          url: withTraffic
+            ? 'https://mt{s}.google.com/vt/lyrs=y,traffic&x={x}&y={y}&z={z}'
+            : 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
           subdomains: ['0', '1', '2', '3'],
           maxZoom: 21,
           className: '',
@@ -221,7 +270,9 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         };
       case 'dark':
         return {
-          url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+          url: withTraffic
+            ? 'https://mt{s}.google.com/vt/lyrs=m,traffic&x={x}&y={y}&z={z}'
+            : 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
           subdomains: ['0', '1', '2', '3'],
           maxZoom: 21,
           className: 'leaflet-tile-subtle-dark',
@@ -230,17 +281,19 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       case 'streets':
       default:
         return {
-          url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+          url: withTraffic
+            ? liveTrafficService.getLiveTrafficTileUrl()
+            : 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
           subdomains: ['0', '1', '2', '3'],
           maxZoom: 21,
           className: '',
-          attribution: '&copy; Tô Passando Cartografia Oficial Google Maps',
+          attribution: '&copy; Tô Passando Cartografia Oficial Google Maps + Tráfego Ao Vivo',
         };
     }
   };
 
-  const createSafeTile = (layer: MapLayerType) => {
-    const config = getLayerConfig(layer);
+  const createSafeTile = (layer: MapLayerType, withTraffic: boolean = isTrafficActive) => {
+    const config = getLayerConfig(layer, withTraffic);
     const tile = L.tileLayer(config.url, {
       maxZoom: config.maxZoom,
       attribution: config.attribution,
@@ -273,7 +326,19 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       mapRef.current.removeLayer(tileLayerRef.current);
     }
 
-    const newTile = createSafeTile(newLayer).addTo(mapRef.current);
+    const newTile = createSafeTile(newLayer, isTrafficActive).addTo(mapRef.current);
+    tileLayerRef.current = newTile;
+  };
+
+  // Toggle Live Traffic Flow Layer (Requirement 1)
+  const toggleTrafficOverlay = () => {
+    const next = !isTrafficActive;
+    setIsTrafficActive(next);
+    if (!mapRef.current) return;
+    if (tileLayerRef.current) {
+      mapRef.current.removeLayer(tileLayerRef.current);
+    }
+    const newTile = createSafeTile(activeLayer, next).addTo(mapRef.current);
     tileLayerRef.current = newTile;
   };
 
@@ -459,18 +524,15 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       placesLayerGroupRef.current = plcGroup;
       communityLayerGroupRef.current = comGroup;
 
-      // Realistic 3D Vehicle Marker
-      const markerIcon = createVehicleDivIcon(
-        user.vehicleModel,
-        user.vehicleColor,
-        heading,
-        user.enableWindEffect,
-        isNavigating
-      );
+      // Realistic 3D Classic Vehicle Marker (Minha Garagem)
+      const markerIcon = getSelectedVehicleIcon(continuousHeadingRef.current);
       const vMarker = L.marker([currentLocation.lat, currentLocation.lng], {
         icon: markerIcon,
         zIndexOffset: 1000,
       }).addTo(map);
+      vMarker.on('click', () => {
+        if (onOpenGaragem) onOpenGaragem();
+      });
       vehicleMarkerRef.current = vMarker;
 
       // Map click handler (allows marking exact spot on map + taking photo)
@@ -584,13 +646,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
 
     vehicleMarkerRef.current.setLatLng([currentLocation.lat, currentLocation.lng]);
 
-    const newIcon = createVehicleDivIcon(
-      user.vehicleModel,
-      user.vehicleColor,
-      heading,
-      user.enableWindEffect,
-      isNavigating
-    );
+    const newIcon = getSelectedVehicleIcon(continuousHeadingRef.current);
     vehicleMarkerRef.current.setIcon(newIcon);
 
     // RTK Satellite Accuracy Ring showing precision
@@ -608,7 +664,19 @@ export const GPSMap: React.FC<GPSMapProps> = ({
       accuracyCircleRef.current.setLatLng([currentLocation.lat, currentLocation.lng]);
       accuracyCircleRef.current.setRadius(accuracyRadius);
     }
-  }, [currentLocation, heading, user.vehicleModel, user.vehicleColor, user.enableWindEffect, isNavigating, gpsAccuracy]);
+  }, [
+    currentLocation,
+    heading,
+    user.vehicleModel,
+    user.vehicleColor,
+    user.selectedClassicCarId,
+    user.selectedClassicCarColorId,
+    user.useSimpleVehicleMarker,
+    user.enableWindEffect,
+    user.accessibility?.reducedMotion,
+    isNavigating,
+    gpsAccuracy
+  ]);
 
   // Draw Professional Technological Laser Routes & Destination Beacon
   useEffect(() => {
@@ -1769,6 +1837,30 @@ export const GPSMap: React.FC<GPSMapProps> = ({
           <Sparkles className="w-5 h-5 text-amber-300" />
         </button>
 
+        {/* Live Traffic Overlay Toggle Button (Requirement 1) */}
+        <button
+          onClick={toggleTrafficOverlay}
+          className={`p-3 rounded-xl shadow-xl border backdrop-blur-md active:scale-95 transition-all flex items-center justify-center ${
+            isTrafficActive
+              ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-emerald-500/25 ring-2 ring-emerald-400/50'
+              : 'bg-slate-900/90 hover:bg-slate-800 text-slate-400 border-slate-700/80'
+          }`}
+          title={isTrafficActive ? 'Tráfego Ao Vivo Ativo (Google Flow RJ) — Clique para Ocultar' : 'Ativar Tráfego Ao Vivo'}
+        >
+          <span className="text-base leading-none select-none">🚦</span>
+        </button>
+
+        {/* Minha Garagem Clássica Button (Requirement 4) */}
+        {onOpenGaragem && (
+          <button
+            onClick={onOpenGaragem}
+            className="p-3 bg-gradient-to-tr from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 rounded-xl shadow-xl border border-amber-300 backdrop-blur-md active:scale-95 transition-all flex items-center justify-center font-black group"
+            title="Minha Garagem Clássica (Fusca, Opala, Chevette, Gol quadrado, Uno...)"
+          >
+            <Car className="w-5 h-5 text-slate-950 group-hover:scale-110 transition-transform" />
+          </button>
+        )}
+
         {/* Layers Menu Trigger */}
         <div className="relative">
           <button
@@ -1929,6 +2021,31 @@ export const GPSMap: React.FC<GPSMapProps> = ({
           <span className="px-1.5 py-0.2 rounded bg-emerald-950 border border-emerald-500/40 text-emerald-400 font-black text-[8px] uppercase">
             Alta Precisão
           </span>
+        </div>
+
+        {/* Live Traffic Flow Telemetry Status Pill (Requirement 1) */}
+        <div
+          onClick={toggleTrafficOverlay}
+          className={`flex items-center gap-2 bg-slate-950/85 backdrop-blur-md border rounded-xl px-2.5 py-1 shadow-lg text-[10px] w-fit cursor-pointer transition-all active:scale-95 ${
+            trafficState.status === 'online'
+              ? 'border-emerald-500/40 text-emerald-200 hover:border-emerald-400'
+              : trafficState.status === 'cached'
+              ? 'border-amber-500/40 text-amber-200 hover:border-amber-400'
+              : 'border-rose-500/40 text-rose-200 hover:border-rose-400'
+          }`}
+          title={`${trafficState.message} (Clique para alternar camada de fluxo no mapa)`}
+        >
+          <div className={`w-2 h-2 rounded-full shrink-0 ${
+            trafficState.status === 'online' ? 'bg-emerald-400 animate-pulse' :
+            trafficState.status === 'cached' ? 'bg-amber-400' : 'bg-rose-500'
+          }`} />
+          <span className="font-semibold">🚦 Trânsito RJ:</span>
+          <span className="font-black uppercase text-[9px]">
+            {trafficState.status === 'online' ? 'Ao Vivo' : trafficState.status === 'cached' ? 'Em Cache' : 'Offline'}
+          </span>
+          {trafficState.lastUpdated && (
+            <span className="text-slate-400 font-mono text-[9px]">({trafficState.lastUpdated})</span>
+          )}
         </div>
 
         {/* 3D Mode & Night Mode Highlights */}

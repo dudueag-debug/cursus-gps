@@ -57,6 +57,9 @@ export interface UserProfile {
   themeMode?: 'dark' | 'light';
   detectedState?: string;
   detectedCity?: string;
+  selectedClassicCarId?: string;
+  selectedClassicCarColorId?: string;
+  useSimpleVehicleMarker?: boolean;
   homeAddress?: HomeAddress | null;
   privacy: {
     shareLocationWithCommunity: boolean;

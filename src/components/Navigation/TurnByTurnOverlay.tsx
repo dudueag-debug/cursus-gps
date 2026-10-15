@@ -181,6 +181,18 @@ export const TurnByTurnOverlay: React.FC<TurnByTurnOverlayProps> = ({
           {/* Voice and Quick Controls */}
           <div className="flex items-center gap-1.5">
             <button
+              onClick={() => {
+                if (step) {
+                  const natural = NavigationEngine.formatNaturalSpokenInstruction(step);
+                  speakInstruction(natural);
+                }
+              }}
+              className="p-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all active:scale-95"
+              title="Repetir Instrução de Voz"
+            >
+              <RotateCw className="w-5 h-5 text-cyan-400" />
+            </button>
+            <button
               onClick={() => setVoiceActive(!voiceActive)}
               className={`p-2.5 rounded-xl border transition-all ${
                 voiceActive
@@ -193,6 +205,46 @@ export const TurnByTurnOverlay: React.FC<TurnByTurnOverlayProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Discrete Intelligent Reroute Notification (Prompt Requirement 2) */}
+        {rerouteOpportunity && (
+          <div className="bg-slate-950/98 border-2 border-lime-400/80 rounded-2xl p-3 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-2 duration-300 text-white space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-lime-400/20 border border-lime-400/40 flex items-center justify-center text-lime-400 shrink-0 shadow-sm">
+                  <Flag className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-black tracking-wider text-lime-400 block">
+                    ⚡ Alternativa mais rápida disponível
+                  </span>
+                  <div className="text-xs font-black text-white">
+                    Economia de ~{rerouteOpportunity.timeSavedMinutes ?? Math.max(1, Math.round((rerouteOpportunity.timeSavedSeconds || 180) / 60))} min • Diferença: {(rerouteOpportunity.distanceDeltaKm ?? ((rerouteOpportunity.distanceDiffMeters || 0) / 1000)) > 0 ? `+${(rerouteOpportunity.distanceDeltaKm ?? ((rerouteOpportunity.distanceDiffMeters || 0) / 1000)).toFixed(1)} km` : `${(rerouteOpportunity.distanceDeltaKm ?? ((rerouteOpportunity.distanceDiffMeters || 0) / 1000)).toFixed(1)} km`}
+                  </div>
+                </div>
+              </div>
+
+              <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                {rerouteOpportunity.reason}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={() => onAcceptReroute?.(rerouteOpportunity.alternativeRoute)}
+                className="flex-1 py-2 px-3 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-black text-xs shadow-md active:scale-95 transition-all text-center"
+              >
+                Ver Alternativa
+              </button>
+              <button
+                onClick={() => onDismissReroute?.()}
+                className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 active:scale-95 transition-all"
+              >
+                Manter minha rota
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Complex Intersections Mode Visualizer (Section 11) */}
         {intersection.isApproaching && intersection.recommendedLanes.length > 0 && (

@@ -8,6 +8,8 @@ export interface RerouteOpportunity {
   reason: string;
   promptTitle: string;
   promptDescription: string;
+  timeSavedSeconds?: number;
+  distanceDiffMeters?: number;
 }
 
 export interface TrafficForecastAlert {

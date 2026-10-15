@@ -49,6 +49,7 @@ interface MenuDrawerProps {
   onOpenBrazilTouristMap?: () => void;
   onOpenToPassandoMomento?: () => void;
   onOpenWazeLive?: () => void;
+  onOpenGaragem?: () => void;
 }
 
 export const MenuDrawer: React.FC<MenuDrawerProps> = ({
@@ -78,6 +79,7 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
   onOpenBrazilTouristMap,
   onOpenToPassandoMomento,
   onOpenWazeLive,
+  onOpenGaragem,
 }) => {
   if (!isOpen) return null;
 
@@ -156,6 +158,17 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
               <RouteIcon className="w-4 h-4 text-cyan-400" />
               <span>🛣️ Traçar Rota & Destino (3 Modos)</span>
             </button>
+
+            {/* Minha Garagem Clássica (Fusca, Opala, Chevette, Gol quadrado...) */}
+            {onOpenGaragem && (
+              <button
+                onClick={() => { onOpenGaragem(); onClose(); }}
+                className="w-full p-2.5 rounded-xl hover:bg-amber-950/60 flex items-center gap-3 text-left transition-colors text-amber-300 font-bold bg-gradient-to-r from-amber-950/60 via-yellow-950/30 to-slate-900 border border-amber-400/50 shadow-sm"
+              >
+                <Car className="w-4 h-4 text-amber-400" />
+                <span>🚗 Minha Garagem Clássica (Fusca, Opala...)</span>
+              </button>
+            )}
 
             {/* Mercados & Pontos Turísticos do Brasil (Google Maps Clean) */}
             <button

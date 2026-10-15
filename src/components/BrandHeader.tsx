@@ -11,6 +11,7 @@ import {
   Download,
   Store,
   AlertTriangle,
+  Car,
 } from 'lucide-react';
 import type { UserProfile, WeatherData } from '../types';
 
@@ -29,6 +30,7 @@ interface BrandHeaderProps {
   onOpenTrafficOccurrences?: () => void;
   onOpenRadars?: () => void;
   onOpenPhotoIncident?: () => void;
+  onOpenGaragem?: () => void;
   activeOccurrencesCount: number;
   detectedLocation?: string;
   weatherData?: WeatherData | null;
@@ -47,6 +49,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
   openNotificationsModal,
   onOpenRoutePlanner,
   onOpenPhotoIncident,
+  onOpenGaragem,
   activeOccurrencesCount,
   detectedLocation = 'GPS ao vivo',
   weatherData,
@@ -282,7 +285,19 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
             <span>🚨 Tudo em Tempo Real ({activeOccurrencesCount})</span>
           </button>
 
-          {/* Tab 4: Dedicated Aba para Baixar o App no Telefone (PWA iOS e Android) */}
+          {/* Tab 4: Minha Garagem Clássica */}
+          {onOpenGaragem && (
+            <button
+              onClick={onOpenGaragem}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black whitespace-nowrap transition-all bg-gradient-to-r from-amber-500/20 to-yellow-500/10 hover:from-amber-500/30 hover:to-yellow-500/20 text-amber-300 border border-amber-400/50 shadow-sm active:scale-95"
+              title="Minha Garagem de Carros Clássicos (Fusca, Opala, Chevette, Gol quadrado, Uno...)"
+            >
+              <Car className="w-3.5 h-3.5 text-amber-400" />
+              <span>🚗 Minha Garagem</span>
+            </button>
+          )}
+
+          {/* Tab 5: Dedicated Aba para Baixar o App no Telefone (PWA iOS e Android) */}
           <button
             onClick={openInstallModal}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black whitespace-nowrap transition-all bg-lime-400/15 hover:bg-lime-400/25 text-lime-300 border border-lime-400/50 shadow-sm"
@@ -291,7 +306,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
             <span>📲 Baixar App (PWA iOS/Android)</span>
           </button>
 
-          {/* Tab 5: Traçar Rota */}
+          {/* Tab 6: Traçar Rota */}
           <button
             onClick={onOpenRoutePlanner}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black whitespace-nowrap transition-all bg-blue-600/25 hover:bg-blue-600/40 text-blue-200 border border-blue-500/40"

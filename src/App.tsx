@@ -28,6 +28,7 @@ import { LayerControlModal, type DetailedLayerPreferences } from './components/P
 import { OfflineRegionsModal } from './components/Panels/OfflineRegionsModal';
 import { ObservabilityDashboardModal } from './components/Panels/ObservabilityDashboardModal';
 import { BrazilTouristMapModal } from './components/Panels/BrazilTouristMapModal';
+import { MinhaGaragemModal } from './components/Panels/MinhaGaragemModal';
 import type { BrazilTouristSpot } from './data/brazilTouristCatalog';
 import { AIPredictionEngine, type RerouteOpportunity } from './engines/aiPredictionEngine';
 import { useVoiceCommander } from './hooks/useVoiceCommander';
@@ -36,6 +37,7 @@ import { api } from './services/api';
 import { locationService } from './services/locationService';
 import { userService } from './services/userService';
 import { weatherService } from './services/weatherService';
+import { backgroundLocationService } from './services/backgroundLocationService';
 import { parseNaturalLanguageQuery } from './services/intelligentSearchService';
 import { CursusIntelligenceEngine, type VehicleProfileSpec } from './services/intelligenceEngine';
 import { gpsEngine } from './services/gpsEngine';
@@ -72,6 +74,9 @@ export function App() {
     enableCultureAudio: true,
     detectedCity: cachedLoc?.city || 'Brasil',
     detectedState: cachedLoc?.state || 'BR',
+    selectedClassicCarId: (typeof window !== 'undefined' ? localStorage.getItem('tp_selected_car_id') : null) || 'vw-fusca',
+    selectedClassicCarColorId: (typeof window !== 'undefined' ? localStorage.getItem('tp_selected_car_color_id') : null) || undefined,
+    useSimpleVehicleMarker: false,
     privacy: {
       shareLocationWithCommunity: true,
       saveRouteHistory: true,
@@ -136,6 +141,7 @@ export function App() {
   const [isOfflineRegionsModalOpen, setIsOfflineRegionsModalOpen] = useState(false);
   const [isObservabilityModalOpen, setIsObservabilityModalOpen] = useState(false);
   const [isBrazilTouristMapOpen, setIsBrazilTouristMapOpen] = useState(false);
+  const [isGaragemModalOpen, setIsGaragemModalOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   // 14 Detailed Layer Preferences
@@ -618,7 +624,7 @@ export function App() {
     }
   };
 
-  // Trigger Navigation Start
+  // Trigger Navigation Start (Requirement 3: Background GPS & Screen Wake Lock)
   const handleStartNavigation = () => {
     if (!selectedRoute) {
       setIsMobilePlannerOpen(true);
@@ -637,6 +643,8 @@ export function App() {
     setIsNavigating(true);
     setActivePanel('map');
     setIsMobilePlannerOpen(false);
+    backgroundLocationService.acquireWakeLock();
+    backgroundLocationService.startBackgroundAudioBeacon();
     speakText('Iniciando navegação GPS. Siga a rota indicada no mapa.');
   };
 
@@ -652,12 +660,35 @@ export function App() {
     }
     setIsNavigating(true);
     setActivePanel('map');
+    backgroundLocationService.acquireWakeLock();
+    backgroundLocationService.startBackgroundAudioBeacon();
   };
 
   const handleExitNavigation = () => {
     setIsNavigating(false);
     setIsRecalculating(false);
+    backgroundLocationService.releaseWakeLock();
+    backgroundLocationService.stopBackgroundAudioBeacon();
     speakText('Navegação encerrada.');
+  };
+
+  // Choose vehicle from Minha Garagem (Requirement 4 & 5)
+  const handleSelectClassicCar = (carId: string, colorId: string, useSimpleMarker: boolean) => {
+    setUser(prev => {
+      const updated = {
+        ...prev,
+        selectedClassicCarId: carId,
+        selectedClassicCarColorId: colorId,
+        useSimpleVehicleMarker: useSimpleMarker,
+      };
+      try {
+        localStorage.setItem('tp_selected_car_id', carId);
+        localStorage.setItem('tp_selected_car_color_id', colorId);
+        localStorage.setItem('tp_user_profile', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    speakText('Veículo da sua garagem selecionado com sucesso!');
   };
 
   // Save Occurrence from Photo AI Modal (Section 11)
@@ -794,6 +825,7 @@ export function App() {
           setPhotoIncidentCoords(currentLocation);
           setIsPhotoIncidentModalOpen(true);
         }}
+        onOpenGaragem={() => setIsGaragemModalOpen(true)}
         weatherData={weatherData}
         activeOccurrencesCount={occurrences.filter(o => !o.isNormalized).length}
         detectedLocation={detectedLocationName}
@@ -818,6 +850,7 @@ export function App() {
             places={places}
             gpsAccuracy={gpsAccuracy}
             liveSpeedKmh={liveSpeedKmh}
+            onOpenGaragem={() => setIsGaragemModalOpen(true)}
             onSelectOccurrence={handleSelectOccurrence}
             onSelectCultureSpot={handleSelectCultureSpot}
             onSelectPlace={handleRouteToPlace}
@@ -1235,6 +1268,7 @@ export function App() {
         onOpenObservability={() => setIsObservabilityModalOpen(true)}
         onOpenBrazilTouristMap={() => setIsBrazilTouristMapOpen(true)}
         onOpenWazeLive={() => setActivePanel('map')}
+        onOpenGaragem={() => setIsGaragemModalOpen(true)}
       />
 
       {/* Camadas do Mapa (14 Camadas) Modal */}
@@ -1266,6 +1300,14 @@ export function App() {
         onClose={() => setIsBrazilTouristMapOpen(false)}
         userCoords={currentLocation}
         onNavigateToSpot={handleNavigateToTouristSpot}
+      />
+
+      {/* Minha Garagem de Carros Clássicos Modal (Fusca, Opala, Chevette, Gol quadrado...) */}
+      <MinhaGaragemModal
+        isOpen={isGaragemModalOpen}
+        onClose={() => setIsGaragemModalOpen(false)}
+        user={user}
+        onSelectCar={handleSelectClassicCar}
       />
     </div>
   );

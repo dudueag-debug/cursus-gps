@@ -105,8 +105,8 @@ export class MapMatchingService {
       this.consecutiveOffRouteCount = 0;
     }
 
-    // Trigger recalculation if off route for 2 or more consecutive updates
-    const needsRecalculation = this.consecutiveOffRouteCount >= 2;
+    // Trigger recalculation only if confirmed off route for 3 or more consecutive updates (deadband stability)
+    const needsRecalculation = this.consecutiveOffRouteCount >= 3;
 
     // Determine current navigation step
     let currentStep: RouteStep | null = null;
