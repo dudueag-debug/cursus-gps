@@ -314,17 +314,10 @@ export const createVehicleDivIcon = (
     </div>
   ` : '';
 
-  const carBadgeHtml = classicCar ? `
-    <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap px-1.5 py-0.5 rounded-md bg-slate-950/90 border border-amber-400/50 text-[8.5px] font-black text-amber-300 shadow pointer-events-none">
-      ${classicCar.model}
-    </div>
-  ` : '';
-
   const finalHtml = `
     <div class="relative flex items-center justify-center cursor-pointer group" style="transform: rotate(${headingDegrees}deg); transition: transform ${options?.reducedMotion ? '0.05s' : '0.2s'} cubic-bezier(0.2, 0.8, 0.4, 1);">
       ${vehicleSvg}
       ${windEffectHtml}
-      ${carBadgeHtml}
     </div>
   `;
 
