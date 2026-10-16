@@ -153,25 +153,25 @@ export const TurnByTurnOverlay: React.FC<TurnByTurnOverlayProps> = ({
           </div>
         )}
 
-        <div className="bg-slate-950/95 backdrop-blur-lg border border-slate-700/80 rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-3 text-white">
-          <div className="flex items-center gap-3.5">
-            <div className="w-14 h-14 rounded-2xl bg-blue-900/60 border border-blue-500/40 flex items-center justify-center shadow-inner shrink-0">
+        <div className="bg-slate-950/95 backdrop-blur-lg border border-slate-700/80 rounded-2xl p-3 shadow-2xl flex items-center justify-between gap-3 text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-900/60 border border-blue-500/40 flex items-center justify-center shadow-inner shrink-0">
               {getManeuverIcon(step.maneuver)}
             </div>
             <div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-lime-400">
+                <span className="text-2xl font-black text-lime-400 font-mono">
                   {step.distanceMeters > 0 ? `${step.distanceMeters} m` : 'Chegando'}
                 </span>
-                <span className="text-xs uppercase font-bold text-slate-400">
+                <span className="text-xs uppercase font-black tracking-wider text-slate-400">
                   {step.maneuver === 'arrive' ? 'Destino Final' : 'Próxima manobra'}
                 </span>
               </div>
-              <p className="text-sm font-semibold text-slate-100 line-clamp-1">
+              <p className="text-base sm:text-lg font-black text-white leading-snug line-clamp-2 mt-0.5">
                 {step.instruction}
               </p>
               {step.streetName && (
-                <p className="text-[11px] text-slate-400 line-clamp-1">
+                <p className="text-xs sm:text-sm font-bold text-cyan-300 line-clamp-1 mt-0.5">
                   {step.streetName}
                 </p>
               )}
@@ -274,20 +274,20 @@ export const TurnByTurnOverlay: React.FC<TurnByTurnOverlayProps> = ({
       {/* Safety Notice & Bottom Navigation HUD */}
       <div className="pointer-events-auto max-w-xl mx-auto w-full flex flex-col gap-2">
         {/* Speedometer, ETA, Distance & Big ENCERRAR Button */}
-        <div className="bg-slate-950/95 backdrop-blur-lg border border-slate-700/80 rounded-2xl p-3.5 shadow-2xl flex items-center justify-between gap-3 text-white">
+        <div className="bg-slate-950/95 backdrop-blur-lg border border-slate-700/80 rounded-2xl p-2.5 sm:p-3 shadow-2xl flex items-center justify-between gap-3 text-white">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
               <Gauge className="w-4 h-4 text-lime-400" />
-              <span className="font-mono text-lg font-black text-white">{speed}</span>
-              <span className="text-[10px] text-slate-400 font-bold">km/h</span>
+              <span className="font-mono text-xl sm:text-2xl font-black text-white">{speed}</span>
+              <span className="text-[10px] text-slate-400 font-black">km/h</span>
             </div>
 
             <div className="flex flex-col">
               <div className="flex items-baseline gap-1.5">
-                <span className="text-base font-black text-white">{Math.round(route.totalDurationSeconds / 60)} min</span>
-                <span className="text-xs text-slate-400 font-medium">({displayDistance})</span>
+                <span className="text-base sm:text-lg font-black text-white">{Math.round(route.totalDurationSeconds / 60)} min</span>
+                <span className="text-xs text-slate-300 font-semibold">({displayDistance})</span>
               </div>
-              <div className="text-[11px] font-bold text-lime-400">
+              <div className="text-xs font-bold text-lime-400">
                 Chegada: {route.eta}
               </div>
             </div>
@@ -296,7 +296,7 @@ export const TurnByTurnOverlay: React.FC<TurnByTurnOverlayProps> = ({
           {/* Prominent Red ENCERRAR Button as required by Section 7 */}
           <button
             onClick={onExitNavigation}
-            className="px-5 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-red-600/30 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-red-600/30 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
             <span>ENCERRAR</span>

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import type { Coordinates, RouteOption, Occurrence, CultureSpot, UserProfile, MapLayerType, Place } from '../../types';
 import { createVehicleDivIcon } from './VehicleMarkerIcon';
-import { Crosshair, ZoomIn, ZoomOut, Eye, Layers, Compass, Box, Map as MapIcon, Globe, Navigation, MapPin, Phone, Star, X, Camera, AlertTriangle, Clock, ShieldAlert, Sparkles, Car } from 'lucide-react';
+import { Crosshair, ZoomIn, ZoomOut, Eye, Layers, Compass, Box, Map as MapIcon, Globe, Navigation, MapPin, Phone, Star, X, Camera, AlertTriangle, Clock, ShieldAlert, Sparkles, Car, SlidersHorizontal } from 'lucide-react';
 import { RIO_COMMUNITY_ZONES, type RioCommunityRiskZone } from '../../data/rioCommunityZones';
 import { liveTrafficService, type LiveTrafficState } from '../../services/liveTrafficService';
 
@@ -122,6 +122,8 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   const [userManuallyChangedLayer, setUserManuallyChangedLayer] = useState<boolean>(false);
   const [is3DMode, setIs3DMode] = useState<boolean>(user.is3DMode || false);
   const [showLayerMenu, setShowLayerMenu] = useState<boolean>(false);
+  const [showMoreMenu, setShowMoreMenu] = useState<boolean>(false);
+  const [activeAlertIndex, setActiveAlertIndex] = useState<number>(0);
   const [activeMapCategory, setActiveMapCategory] = useState<string>('all');
   const [selectedMapPlace, setSelectedMapPlace] = useState<Place | null>(null);
   const [selectedMapOccurrence, setSelectedMapOccurrence] = useState<Occurrence | null>(null);
@@ -1185,6 +1187,277 @@ export const GPSMap: React.FC<GPSMapProps> = ({
     }
   };
 
+  // Requirement 1 & 2: Prioritização de alertas (1 card grande prioritário por vez + chips compactos para outros simultâneos)
+  const renderPrioritizedAlertCard = () => {
+    interface PrioritizedAlertItem {
+      id: string;
+      type: string;
+      priority: number;
+      icon: React.ReactNode;
+      badge: string;
+      badgeClass: string;
+      title: string;
+      description: string;
+      distanceText?: string;
+      compactLabel: string;
+      emoji: string;
+      actionButton?: {
+        label: string;
+        onClick: () => void;
+      };
+      onDismiss?: () => void;
+    }
+
+    const alertItems: PrioritizedAlertItem[] = [];
+
+    // 1. Extreme Risk: Active Community Zone Traversal
+    if (activeCommunityZone) {
+      const mins = String(Math.floor(communitySecondsElapsed / 60)).padStart(2, '0');
+      const secs = String(communitySecondsElapsed % 60).padStart(2, '0');
+      alertItems.push({
+        id: `comm-active-${activeCommunityZone.id}`,
+        type: 'community_active',
+        priority: 1,
+        emoji: '🚨',
+        compactLabel: `🚨 ${activeCommunityZone.name}`,
+        icon: (
+          <div className="w-10 h-10 rounded-2xl bg-red-600 border-2 border-white flex items-center justify-center text-white shrink-0 shadow-lg animate-pulse">
+            <ShieldAlert className="w-5 h-5 stroke-[2.5]" />
+          </div>
+        ),
+        badge: 'ÁREA DE COMUNIDADE • EXTREMO RISCO',
+        badgeClass: 'bg-red-600 text-white',
+        title: `${activeCommunityZone.name} (${activeCommunityZone.complexName})`,
+        description: '🔒 Mantenha vidros levantados • 💡 Farol baixo • Não pare na via',
+        distanceText: `Tempo no local: ${mins}:${secs}`,
+        onDismiss: () => setDismissedCommunityId(activeCommunityZone.id),
+      });
+    }
+
+    // 2. Approaching Community Risk Zone (< 350m)
+    if (approachingCommunityZone && !activeCommunityZone && approachingCommunityZone.zone.id !== dismissedCommunityId) {
+      alertItems.push({
+        id: `comm-appr-${approachingCommunityZone.zone.id}`,
+        type: 'community_approaching',
+        priority: 2,
+        emoji: '⚠️',
+        compactLabel: `⚠️ Risco a ~${approachingCommunityZone.distanceMeters}m`,
+        icon: (
+          <div className="w-10 h-10 rounded-2xl bg-amber-500 border-2 border-white flex items-center justify-center text-slate-950 shrink-0 shadow-lg animate-bounce">
+            <ShieldAlert className="w-5 h-5 text-slate-950 stroke-[2.5]" />
+          </div>
+        ),
+        badge: `APROXIMAÇÃO DE COMUNIDADE • A ~${approachingCommunityZone.distanceMeters}M`,
+        badgeClass: 'bg-amber-500 text-slate-950 font-black',
+        title: `${approachingCommunityZone.zone.name} (${approachingCommunityZone.zone.complexName})`,
+        description: '🛑 ATENÇÃO: NÃO ADENTRE SE NÃO FOR SEU DESTINO! Permaneça na via principal.',
+        distanceText: `A ~${approachingCommunityZone.distanceMeters}m`,
+        onDismiss: () => setDismissedCommunityId(approachingCommunityZone.zone.id),
+      });
+    }
+
+    // 3. Imminent Radar with Over-Speed (Critical)
+    if (nearbyRadar && isOverSpeed) {
+      alertItems.push({
+        id: `radar-over-${nearbyRadar.id}`,
+        type: 'radar_overspeed',
+        priority: 3,
+        emoji: '📸',
+        compactLabel: `📸 ${radarSpeedLimit}km/h (Alerta)`,
+        icon: (
+          <div className="w-11 h-11 rounded-full bg-white border-4 border-red-600 flex flex-col items-center justify-center shrink-0 shadow-xl animate-bounce ring-4 ring-red-500">
+            <span className="text-slate-950 font-black text-sm leading-none">{radarSpeedLimit}</span>
+            <span className="text-slate-800 font-bold text-[7px] leading-none uppercase">km/h</span>
+          </div>
+        ),
+        badge: '⚠️ REDUZA A VELOCIDADE! ACIMA DO LIMITE',
+        badgeClass: 'bg-red-600 text-white animate-pulse',
+        title: `${nearbyRadar.title}`,
+        description: `Você está a ${currentSpeed} km/h (Limite ${radarSpeedLimit} km/h). Radar a ${radarDistance}m à frente!`,
+        distanceText: `A ${radarDistance}m`,
+        actionButton: {
+          label: 'Ver Radar',
+          onClick: () => {
+            setSelectedMapOccurrence(nearbyRadar);
+            setSelectedMapPlace(null);
+          },
+        },
+      });
+    }
+
+    // 4. Passing through Demarcated Incident / Risk Area
+    if (activeRiskZone && activeRiskZone.id !== zoneDismissedId) {
+      const mins = String(Math.floor(zoneSecondsElapsed / 60)).padStart(2, '0');
+      const secs = String(zoneSecondsElapsed % 60).padStart(2, '0');
+      alertItems.push({
+        id: `zone-pass-${activeRiskZone.id}`,
+        type: 'risk_zone',
+        priority: 4,
+        emoji: '⚠️',
+        compactLabel: `⚠️ ${activeRiskZone.title}`,
+        icon: (
+          <div
+            className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg animate-pulse"
+            style={{ backgroundColor: activeRiskZone.zoneColor || '#dc2626' }}
+          >
+            <AlertTriangle className="w-5 h-5 text-white" />
+          </div>
+        ),
+        badge: `TRANSITANDO EM ÁREA DE ATENÇÃO (${activeRiskZone.riskRadiusMeters || 200}M)`,
+        badgeClass: 'bg-rose-700 text-white',
+        title: `${activeRiskZone.title}`,
+        description: `Tempo no local: ${mins}:${secs} • ${activeRiskZone.description || 'Atenção redobrada na via'}`,
+        distanceText: `${mins}:${secs}`,
+        onDismiss: () => setZoneDismissedId(activeRiskZone.id),
+      });
+    }
+
+    // 5. Approaching Police Patrol or Lei Seca (< 500m)
+    if (nearbyPoliceOrBlitz) {
+      const isLeiSeca = nearbyPoliceOrBlitz.category === 'blitz' || nearbyPoliceOrBlitz.title.toLowerCase().includes('lei seca');
+      alertItems.push({
+        id: `police-${nearbyPoliceOrBlitz.id}`,
+        type: 'police_blitz',
+        priority: 5,
+        emoji: isLeiSeca ? '🛑' : '🚓',
+        compactLabel: isLeiSeca ? `🛑 Blitz a ~${policeDistance}m` : `🚓 Polícia a ~${policeDistance}m`,
+        icon: (
+          <div className="w-10 h-10 rounded-2xl bg-indigo-600 border-2 border-indigo-400 flex items-center justify-center text-white shrink-0 shadow-lg">
+            <span className="text-xl leading-none">{isLeiSeca ? '🛑' : '🚓'}</span>
+          </div>
+        ),
+        badge: isLeiSeca ? 'OPERAÇÃO LEI SECA • FISCALIZAÇÃO' : 'PATRULHAMENTO POLICIAL NA PISTA',
+        badgeClass: isLeiSeca ? 'bg-amber-500 text-slate-950 font-black' : 'bg-indigo-600 text-white',
+        title: `${nearbyPoliceOrBlitz.title}`,
+        description: `Localização: ${nearbyPoliceOrBlitz.locationName || 'Trecho monitorado'} • ${policeDistance}m à frente`,
+        distanceText: `A ~${policeDistance}m`,
+        actionButton: {
+          label: 'Ver Detalhes',
+          onClick: () => {
+            setSelectedMapOccurrence(nearbyPoliceOrBlitz);
+            setSelectedMapPlace(null);
+          },
+        },
+      });
+    }
+
+    // 6. Normal Radar (Speed Compatible)
+    if (nearbyRadar && !isOverSpeed) {
+      alertItems.push({
+        id: `radar-norm-${nearbyRadar.id}`,
+        type: 'radar_normal',
+        priority: 6,
+        emoji: '📸',
+        compactLabel: `📸 Radar ${radarSpeedLimit}km/h`,
+        icon: (
+          <div className="w-10 h-10 rounded-full bg-white border-4 border-red-600 flex flex-col items-center justify-center shrink-0 shadow-lg ring-2 ring-red-500/40">
+            <span className="text-slate-950 font-black text-xs leading-none">{radarSpeedLimit}</span>
+            <span className="text-slate-700 font-bold text-[6.5px] leading-none uppercase">km/h</span>
+          </div>
+        ),
+        badge: `RADAR À FRENTE • LIMITE ${radarSpeedLimit} KM/H`,
+        badgeClass: 'bg-slate-800 text-red-400 border border-red-500/40',
+        title: `${nearbyRadar.title}`,
+        description: `✓ Velocidade (${currentSpeed} km/h) compatível • ${nearbyRadar.locationName || 'Via monitorada'}`,
+        distanceText: `A ${radarDistance}m`,
+        actionButton: {
+          label: 'Ver Radar',
+          onClick: () => {
+            setSelectedMapOccurrence(nearbyRadar);
+            setSelectedMapPlace(null);
+          },
+        },
+      });
+    }
+
+    if (alertItems.length === 0) return null;
+
+    // Sort by priority (1 to 6)
+    alertItems.sort((a, b) => a.priority - b.priority);
+    const activeAlert = alertItems[activeAlertIndex] || alertItems[0];
+
+    return (
+      <div className="pointer-events-auto max-w-xl w-full mx-auto flex flex-col gap-1.5 animate-in slide-in-from-top-3 duration-200">
+        {/* 1. CARD PRINCIPAL GRANDE E PRIORITÁRIO */}
+        <div className="bg-slate-950/95 border-2 border-slate-700/80 rounded-2xl p-2.5 sm:p-3 shadow-2xl backdrop-blur-xl flex items-center justify-between gap-3 text-white">
+          {/* Left Icon */}
+          {activeAlert.icon}
+
+          {/* Center Content with High Readability */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`px-2 py-0.5 rounded-md font-black text-xs uppercase tracking-wider shadow ${activeAlert.badgeClass}`}>
+                {activeAlert.badge}
+              </span>
+              {activeAlert.distanceText && (
+                <span className="text-xs sm:text-sm font-black text-amber-300 font-mono">
+                  {activeAlert.distanceText}
+                </span>
+              )}
+            </div>
+
+            <div className="text-sm sm:text-base font-black text-white mt-1 leading-snug line-clamp-1">
+              {activeAlert.title}
+            </div>
+
+            <div className="text-xs sm:text-sm font-semibold text-slate-200 mt-0.5 leading-tight line-clamp-1">
+              {activeAlert.description}
+            </div>
+          </div>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {activeAlert.actionButton && (
+              <button
+                onClick={activeAlert.actionButton.onClick}
+                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow transition-all cursor-pointer"
+              >
+                {activeAlert.actionButton.label}
+              </button>
+            )}
+
+            {activeAlert.onDismiss && (
+              <button
+                onClick={activeAlert.onDismiss}
+                className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                title="Ocultar alerta"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 2. PÍLULAS COMPACTAS (Para os demais alertas simultâneos) */}
+        {alertItems.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto py-0.5">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0 pl-1">
+              Outros alertas ({alertItems.length - 1}):
+            </span>
+            {alertItems.map((item, idx) => {
+              if (item.id === activeAlert.id) return null;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveAlertIndex(idx)}
+                  className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/95 hover:bg-slate-850 border border-slate-700/80 text-xs font-bold text-slate-200 hover:text-white shadow-md active:scale-95 transition-all"
+                >
+                  <span>{item.emoji}</span>
+                  <span>{item.compactLabel}</span>
+                  {item.distanceText && (
+                    <span className="text-amber-300 font-mono text-[11px] font-black">
+                      • {item.distanceText}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="relative w-full h-full min-h-[300px] bg-slate-950 overflow-hidden flex flex-col isolate z-0">
       {/* 3D Viewport Transform Wrapper - Perfect Center Origin */}
@@ -1212,25 +1485,15 @@ export const GPSMap: React.FC<GPSMapProps> = ({
               className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-[11px] shadow-xl border border-cyan-300 active:scale-95 transition-all"
             >
               <Compass className="w-3.5 h-3.5 text-slate-950 animate-spin" style={{ animationDuration: '9s' }} />
-              <span>Tô Passando Nesse Momento</span>
+              <span>Tô Passando</span>
             </button>
-
-            {onOpenPhotoIncident && (
-              <button
-                onClick={() => onOpenPhotoIncident(tappedMapCoords || currentLocation)}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-rose-600 to-amber-500 hover:brightness-110 text-white font-black text-[11px] shadow-xl border border-rose-300 active:scale-95 transition-all"
-              >
-                <Camera className="w-3.5 h-3.5 text-white" />
-                <span>📸 Marcar Local + Foto</span>
-              </button>
-            )}
 
             {onOpenQuickSignals && (
               <button
                 onClick={onOpenQuickSignals}
                 className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-red-600/90 hover:bg-red-500 text-white font-black text-[11px] shadow-xl border border-red-400 active:scale-95 transition-all"
               >
-                <span>🚨 Sinalizar na Via</span>
+                <span>🚨 Sinalizar</span>
               </button>
             )}
 
@@ -1239,23 +1502,9 @@ export const GPSMap: React.FC<GPSMapProps> = ({
                 onClick={onOpenOccurrences}
                 className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-slate-950/90 hover:bg-slate-900 text-amber-300 font-black text-[11px] shadow-xl border border-amber-500/40 active:scale-95 transition-all"
               >
-                <span>👮📸 Fica Atento Tô Passando ({occurrences.length})</span>
+                <span>👮 Ocorrências ({occurrences.length})</span>
               </button>
             )}
-
-            {/* Quick Declutter / Clean Visual Map Toggle */}
-            <button
-              onClick={() => setIsDeclutterActive(!isDeclutterActive)}
-              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black shadow-xl border active:scale-95 transition-all ${
-                isDeclutterActive
-                  ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 border-amber-300 ring-2 ring-amber-400/40 shadow-amber-500/30'
-                  : 'bg-slate-950/90 hover:bg-slate-900 text-emerald-300 border-emerald-500/40'
-              }`}
-              title={isDeclutterActive ? 'Modo Limpo Ativo (Pistas Despoluídas). Clique para reexibir todos os comércios.' : 'Despoluir Mapa (Ocultar comércios secundários e deixar pistas limpas)'}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{isDeclutterActive ? '✨ Mapa Despoluído' : '🧹 Despoluir Mapa'}</span>
-            </button>
 
             {MAP_QUICK_CATEGORIES.map(cat => {
               const isSelected = activeMapCategory === cat.key;
@@ -1276,228 +1525,8 @@ export const GPSMap: React.FC<GPSMapProps> = ({
             })}
           </div>
 
-          {/* Proximity Speed Camera (Pardal) Alert Banner */}
-          {nearbyRadar && (
-            <div className="pointer-events-auto max-w-lg w-full bg-gradient-to-r from-red-950/95 via-slate-950/95 to-amber-950/95 border-2 border-red-500 rounded-2xl p-3 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-4 duration-300">
-              <div className="flex items-center justify-between gap-3">
-                {/* Brazilian Regulatory Speed Limit Sign (Placa R-19) */}
-                <div className={`w-12 h-12 rounded-full bg-white border-4 border-red-600 flex flex-col items-center justify-center shrink-0 shadow-xl ${isOverSpeed ? 'animate-bounce ring-4 ring-red-500' : 'ring-2 ring-red-500/50'}`}>
-                  <span className="text-slate-950 font-black text-sm leading-none">{radarSpeedLimit}</span>
-                  <span className="text-slate-700 font-bold text-[7px] leading-none uppercase">km/h</span>
-                </div>
-
-                {/* Radar Details */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-2 py-0.5 rounded-md bg-red-600 text-white font-black text-[9px] uppercase tracking-wider flex items-center gap-1 animate-pulse shadow">
-                      📸 RADAR / PARDAL APROXIMANDO-SE
-                    </span>
-                    <span className="text-xs font-black text-amber-300 font-mono">
-                      A {radarDistance} METROS
-                    </span>
-                  </div>
-                  <div className="text-xs font-black text-white truncate mt-1">
-                    {nearbyRadar.title} • {nearbyRadar.locationName || 'Trecho Monitorado'}
-                  </div>
-                  {isOverSpeed ? (
-                    <div className="text-[10px] font-black text-rose-300 flex items-center gap-1 mt-0.5 animate-pulse">
-                      ⚠️ VELOCIDADE ({currentSpeed} km/h) ACIMA DO LIMITE! REDUZA A VELOCIDADE!
-                    </div>
-                  ) : (
-                    <div className="text-[10px] font-bold text-emerald-400 mt-0.5 flex items-center gap-1">
-                      <span>✓</span>
-                      <span>Velocidade monitorada ({currentSpeed} km/h) compatível com a via</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Camera / Action icon */}
-                <button
-                  onClick={() => {
-                    setSelectedMapOccurrence(nearbyRadar);
-                    setSelectedMapPlace(null);
-                  }}
-                  className="p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-red-500/50 text-red-400 hover:text-white shrink-0 text-xs font-bold transition-all"
-                  title="Ver Detalhes do Radar"
-                >
-                  <Camera className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Proximity Police Patrol or Blitz Lei Seca Alert Banner (< 500m on road) */}
-          {nearbyPoliceOrBlitz && (
-            <div className="pointer-events-auto max-w-lg w-full bg-slate-950/98 border-2 border-blue-500 rounded-2xl p-2.5 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-3 duration-300">
-              <div className="flex items-center justify-between gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 border-2 border-white flex items-center justify-center text-white shrink-0 shadow-lg animate-pulse">
-                  <span className="text-base">
-                    {nearbyPoliceOrBlitz.category === 'blitz' || nearbyPoliceOrBlitz.title.toLowerCase().includes('lei seca') ? '🛑' : '🚓'}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[9px] uppercase tracking-wider flex items-center gap-1 shadow">
-                      {nearbyPoliceOrBlitz.category === 'blitz' || nearbyPoliceOrBlitz.title.toLowerCase().includes('lei seca')
-                        ? '🛑 OPERAÇÃO LEI SECA / BAFÔMETRO'
-                        : '🚓 PATRULHAMENTO NA PISTA • POLÍCIA'}
-                    </span>
-                    <span className="text-xs font-black text-cyan-300 font-mono">
-                      A ~{policeDistance} METROS
-                    </span>
-                  </div>
-                  <div className="text-xs font-black text-white truncate mt-0.5">
-                    {nearbyPoliceOrBlitz.title}
-                  </div>
-                  <div className="text-[10px] text-slate-300 truncate">
-                    📍 {nearbyPoliceOrBlitz.locationName} • Fiscalização / patrulhamento ativo na via
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setSelectedMapOccurrence(nearbyPoliceOrBlitz);
-                    setSelectedMapPlace(null);
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-[11px] shrink-0 shadow transition-all"
-                >
-                  Ver no Mapa
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Approaching Community Risk Zone Alert (~300m Warning to Avoid Entering if not on route) */}
-          {approachingCommunityZone && !activeCommunityZone && approachingCommunityZone.zone.id !== dismissedCommunityId && (
-            <div className="pointer-events-auto max-w-lg w-full bg-gradient-to-r from-amber-950/98 via-red-950/98 to-slate-950/98 border-2 border-amber-500 rounded-2xl p-3 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-4 duration-300">
-              <div className="flex items-start justify-between gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-amber-500 border-2 border-white flex items-center justify-center text-slate-950 shrink-0 shadow-lg animate-bounce">
-                  <ShieldAlert className="w-5 h-5 text-slate-950" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-wider">
-                      ⚠️ APROXIMAÇÃO DE ÁREA DE RISCO A ~{approachingCommunityZone.distanceMeters}M
-                    </span>
-                    <span className="text-[10px] font-bold text-amber-300">
-                      {approachingCommunityZone.zone.neighborhood}
-                    </span>
-                  </div>
-                  <div className="text-xs font-black text-white truncate mt-1">
-                    {approachingCommunityZone.zone.name} ({approachingCommunityZone.zone.complexName})
-                  </div>
-                  <div className="text-[10.5px] text-amber-200 mt-1 leading-snug font-bold bg-red-950/80 p-2 rounded-xl border border-red-500/50">
-                    🛑 ATENÇÃO: NÃO ADENTRE NESTE LOCAL SE NÃO FOR SEU DESTINO! Permaneça na via principal expressa da sua rota com vidros levantados e luz baixa.
-                  </div>
-                </div>
-                <button
-                  onClick={() => setDismissedCommunityId(approachingCommunityZone.zone.id)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900"
-                  title="Ocultar aviso"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Active Community Zone Entry Alert & Live Traversal Timer */}
-          {activeCommunityZone && (
-            <div className="pointer-events-auto max-w-lg w-full bg-gradient-to-r from-red-950/98 via-rose-950/98 to-slate-950/98 border-2 border-red-500 rounded-2xl p-3 shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-4 duration-300">
-              <div className="flex items-start justify-between gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-red-600 border-2 border-white flex items-center justify-center text-white shrink-0 shadow-lg animate-pulse">
-                  <ShieldAlert className="w-5 h-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-2 py-0.5 rounded-md bg-red-600 text-white font-black text-[9px] uppercase tracking-wider">
-                      🚨 ÁREA DE COMUNIDADE • EXTREMO RISCO
-                    </span>
-                    <span className="text-[10px] font-mono font-black text-amber-300 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-amber-400" />
-                      Tempo na comunidade: {String(Math.floor(communitySecondsElapsed / 60)).padStart(2, '0')}:
-                      {String(communitySecondsElapsed % 60).padStart(2, '0')}
-                    </span>
-                  </div>
-                  <div className="text-xs font-black text-white truncate mt-1">
-                    {activeCommunityZone.name} ({activeCommunityZone.complexName})
-                  </div>
-                  <div className="text-[10px] text-amber-200 mt-1 leading-snug font-semibold">
-                    🔒 Mantenha vidros levantados • 💡 Farol baixo • 🚗 Velocidade moderada e constante • ⚠️ Evite paradas e manobras bruscas
-                  </div>
-                </div>
-                <button
-                  onClick={() => setDismissedCommunityId(activeCommunityZone.id)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900"
-                  title="Ocultar aviso"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Active Risk Zone Entry Alert & Live Countdown/Elapsed Timer Until Exit */}
-          {activeRiskZone && (
-            <div className="pointer-events-auto max-w-md bg-gradient-to-r from-red-950/95 via-rose-950/95 to-slate-950/95 border-2 border-rose-500 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md animate-in fade-in duration-200">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-rose-600 flex items-center justify-center text-white shrink-0 animate-pulse shadow-lg">
-                    <ShieldAlert className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="px-1.5 py-0.2 rounded bg-rose-500 text-white font-black text-[9px] uppercase tracking-wider">
-                        ALERTA DE ENTRADA EM LOCAL DE RISCO
-                      </span>
-                      <span className="text-[10px] font-mono font-black text-amber-300 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-amber-400" />
-                        Tempo no local: {String(Math.floor(zoneSecondsElapsed / 60)).padStart(2, '0')}:
-                        {String(zoneSecondsElapsed % 60).padStart(2, '0')}
-                      </span>
-                    </div>
-                    <div className="text-xs font-black text-white truncate mt-0.5">
-                      {activeRiskZone.title}
-                    </div>
-                    <div className="text-[10px] text-rose-200 line-clamp-2 leading-snug">
-                      {activeRiskZone.description}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setZoneDismissedId(activeRiskZone.id);
-                    setActiveRiskZone(null);
-                  }}
-                  className="p-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white shrink-0"
-                  title="Fechar alerta de zona"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {(() => {
-                const distToCenter = calcDistanceMeters(currentLocation, activeRiskZone.coordinates);
-                const radius = activeRiskZone.riskRadiusMeters || 280;
-                const remainingMeters = Math.max(40, Math.round(radius + 60 - Math.min(distToCenter, radius)));
-                const estSecondsToExit = Math.max(15, Math.round(remainingMeters / 8.5) - zoneSecondsElapsed);
-                const minsLeft = Math.floor(estSecondsToExit / 60);
-                const secsLeft = estSecondsToExit % 60;
-                return (
-                  <div className="mt-2 pt-1.5 border-t border-rose-500/30 flex items-center justify-between text-[10px] font-bold">
-                    <span className="text-lime-300">
-                      ⏱️ Tempo estimado até sair deste local: ~{String(minsLeft).padStart(2, '0')}:{String(secsLeft).padStart(2, '0')} ({remainingMeters}m)
-                    </span>
-                    <button
-                      onClick={() => setSelectedMapOccurrence(activeRiskZone)}
-                      className="text-cyan-300 hover:underline font-black"
-                    >
-                      Ver Foto & Detalhes →
-                    </button>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
+          {/* Prioritized Single Alert Card + Compact Secondary Pills (Requirement 1 & 2: Reduzir Poluição e Priorizar Alertas) */}
+          {renderPrioritizedAlertCard()}
 
           {/* Quick Prompt when User Taps a Point on the Map */}
           {tappedMapCoords && (
@@ -1551,6 +1580,13 @@ export const GPSMap: React.FC<GPSMapProps> = ({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Active Navigation Floating Critical Alert Card (Single Card, placed cleanly below TurnByTurn maneuver card) */}
+      {isNavigating && (
+        <div className="absolute top-28 sm:top-24 inset-x-0 z-30 flex flex-col items-center gap-1.5 pointer-events-none px-2 sm:px-14">
+          {renderPrioritizedAlertCard()}
         </div>
       )}
 
@@ -1776,194 +1812,203 @@ export const GPSMap: React.FC<GPSMapProps> = ({
         </div>
       )}
 
-      {/* Floating Controls HUD (Strictly lower z-index than headers and modals) */}
+      {/* Floating Controls HUD (Clean 3-Button Stack: Centralizar, Trânsito e Menu "Mais") */}
       <div className="absolute top-14 right-3 z-30 flex flex-col gap-2">
-        {/* Recenter Button */}
+        {/* 1. Recenter Button (Essencial) */}
         <button
           onClick={handleRecenter}
-          className="p-3 bg-slate-900/90 hover:bg-slate-800 text-lime-400 rounded-xl shadow-xl border border-slate-700/80 backdrop-blur-md active:scale-95 transition-all group"
+          className="p-3 bg-slate-900/95 hover:bg-slate-800 text-lime-400 rounded-2xl shadow-xl border border-slate-700/80 backdrop-blur-md active:scale-95 transition-all group cursor-pointer"
           title="Centralizar no Meu Veículo (GPS)"
         >
           <Crosshair className="w-5 h-5 group-hover:rotate-45 transition-transform" />
         </button>
 
-        {/* Quick Camera Mark Button on Right HUD */}
-        {onOpenPhotoIncident && (
-          <button
-            onClick={() => onOpenPhotoIncident(tappedMapCoords || currentLocation)}
-            className="p-3 bg-rose-600/95 hover:bg-rose-500 text-white rounded-xl shadow-xl border border-rose-400 backdrop-blur-md active:scale-95 transition-all"
-            title="Marcar Local de Roubo ou Problema na Via + Tirar Foto"
-          >
-            <Camera className="w-5 h-5" />
-          </button>
-        )}
-
-        {/* Noturno Automático / Manual Quick Toggle */}
-        <button
-          onClick={() => switchLayer(activeLayer === 'dark' ? 'streets' : 'dark', true)}
-          className={`p-3 rounded-xl shadow-xl border backdrop-blur-md active:scale-95 transition-all flex items-center justify-center ${
-            activeLayer === 'dark'
-              ? 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-500/30'
-              : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700/80'
-          }`}
-          title={activeLayer === 'dark' ? 'Modo Noturno Ativo (Destaque de Iluminação e Sinalização)' : 'Ativar Modo Noturno'}
-        >
-          <span className="text-base leading-none select-none">🌙</span>
-        </button>
-
-        {/* 3D Perspective Toggle Button */}
-        <button
-          onClick={() => setIs3DMode(!is3DMode)}
-          className={`p-3 rounded-xl shadow-xl border backdrop-blur-md active:scale-95 transition-all flex items-center justify-center font-black text-xs ${
-            is3DMode
-              ? 'bg-lime-400 text-slate-950 border-lime-300 shadow-lime-500/20'
-              : 'bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border-slate-700/80'
-          }`}
-          title={is3DMode ? 'Desativar Visão 3D' : 'Ativar Modo Cockpit 3D'}
-        >
-          <Box className="w-5 h-5" />
-        </button>
-
-        {/* Quick Declutter HUD Toggle Button */}
-        <button
-          onClick={() => setIsDeclutterActive(!isDeclutterActive)}
-          className={`p-3 rounded-xl shadow-xl border backdrop-blur-md active:scale-95 transition-all flex items-center justify-center ${
-            isDeclutterActive
-              ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-amber-500/25 ring-2 ring-amber-400/50'
-              : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700/80'
-          }`}
-          title={isDeclutterActive ? 'Modo Limpo Ativo (Mostrando Apenas Alertas e Rotas) — Clique para Exibir Todos os Locais' : 'Despoluir Mapa (Ocultar Comércios Secundários e Limpar Pistas)'}
-        >
-          <Sparkles className="w-5 h-5 text-amber-300" />
-        </button>
-
-        {/* Live Traffic Overlay Toggle Button (Requirement 1) */}
+        {/* 2. Live Traffic Overlay Toggle (Essencial) */}
         <button
           onClick={toggleTrafficOverlay}
-          className={`p-3 rounded-xl shadow-xl border backdrop-blur-md active:scale-95 transition-all flex items-center justify-center ${
+          className={`p-3 rounded-2xl shadow-xl border backdrop-blur-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
             isTrafficActive
               ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-emerald-500/25 ring-2 ring-emerald-400/50'
-              : 'bg-slate-900/90 hover:bg-slate-800 text-slate-400 border-slate-700/80'
+              : 'bg-slate-900/95 hover:bg-slate-800 text-slate-400 border-slate-700/80'
           }`}
-          title={isTrafficActive ? 'Tráfego Ao Vivo Ativo (Google Flow RJ) — Clique para Ocultar' : 'Ativar Tráfego Ao Vivo'}
+          title={isTrafficActive ? 'Tráfego Ao Vivo Ativo — Clique para Ocultar' : 'Ativar Tráfego Ao Vivo (Google Flow RJ)'}
         >
           <span className="text-base leading-none select-none">🚦</span>
         </button>
 
-        {/* Minha Garagem Clássica Button (Requirement 4) */}
-        {onOpenGaragem && (
-          <button
-            onClick={onOpenGaragem}
-            className="p-3 bg-gradient-to-tr from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 rounded-xl shadow-xl border border-amber-300 backdrop-blur-md active:scale-95 transition-all flex items-center justify-center font-black group"
-            title="Minha Garagem Clássica (Fusca, Opala, Chevette, Gol quadrado, Uno...)"
-          >
-            <Car className="w-5 h-5 text-slate-950 group-hover:scale-110 transition-transform" />
-          </button>
-        )}
-
-        {/* Layers Menu Trigger */}
+        {/* 3. Menu "Mais..." (Agrupa todos os controles secundários liberando espaço no mapa) */}
         <div className="relative">
           <button
-            onClick={() => setShowLayerMenu(!showLayerMenu)}
-            className={`p-3 rounded-xl shadow-xl border backdrop-blur-md active:scale-95 transition-all ${
-              showLayerMenu
-                ? 'bg-blue-600 text-white border-blue-400'
-                : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-slate-700/80'
+            onClick={() => setShowMoreMenu(!showMoreMenu)}
+            className={`p-3 rounded-2xl shadow-xl border backdrop-blur-md active:scale-95 transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+              showMoreMenu
+                ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-cyan-500/30'
+                : 'bg-slate-900/95 hover:bg-slate-800 text-cyan-400 border-slate-700/80'
             }`}
-            title="Escolher Camadas (Mapa Tô Passando / Satélite / Relevo)"
+            title="Mais Opções e Controles do Mapa"
           >
-            <Layers className="w-5 h-5" />
+            <SlidersHorizontal className="w-5 h-5" />
+            <span className="text-[8px] font-black uppercase tracking-tight">Mais</span>
           </button>
 
-          {/* Layer Selection Dropdown */}
-          {showLayerMenu && (
-            <div className="absolute right-12 top-0 bg-slate-900/95 border border-slate-700 rounded-2xl shadow-2xl p-2 w-52 flex flex-col gap-1 backdrop-blur-md z-40">
-              <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 px-2 py-1">
-                Visualização Cartográfica
+          {/* Popover "Mais" Flutuante */}
+          {showMoreMenu && (
+            <div className="absolute right-14 top-0 bg-slate-950/98 border border-slate-700 rounded-2xl shadow-2xl p-2.5 w-64 flex flex-col gap-1.5 backdrop-blur-xl z-50 animate-in fade-in zoom-in-95 duration-150 text-white">
+              <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 px-1">
+                <span className="text-xs font-black uppercase tracking-wider text-cyan-400">
+                  Mais Opções do Mapa
+                </span>
+                <button
+                  onClick={() => setShowMoreMenu(false)}
+                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
-              
-              <button
-                onClick={() => { switchLayer('streets', true); setShowLayerMenu(false); }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeLayer === 'streets'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <MapIcon className="w-4 h-4 text-lime-400" />
-                <span>🧭 Google Maps Ruas & Nomes (Oficial)</span>
-              </button>
 
-              <button
-                onClick={() => { switchLayer('satellite', true); setShowLayerMenu(false); }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeLayer === 'satellite'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <Globe className="w-4 h-4 text-cyan-400" />
-                <span>🛰️ Google Satélite HD com Ruas</span>
-              </button>
+              {/* Minha Garagem Clássica */}
+              {onOpenGaragem && (
+                <button
+                  onClick={() => {
+                    onOpenGaragem();
+                    setShowMoreMenu(false);
+                  }}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-300 bg-amber-950/30 hover:bg-amber-900/40 border border-amber-500/30 transition-all text-left cursor-pointer"
+                >
+                  <Car className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>🚗 Minha Garagem Clássica</span>
+                </button>
+              )}
 
+              {/* Modo Noturno */}
               <button
-                onClick={() => { switchLayer('topo', true); setShowLayerMenu(false); }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeLayer === 'topo'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <Compass className="w-4 h-4 text-amber-400" />
-                <span>🏔️ Google Relevo & Topografia</span>
-              </button>
-
-              <button
-                onClick={() => { switchLayer('dark', true); setShowLayerMenu(false); }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                onClick={() => {
+                  switchLayer(activeLayer === 'dark' ? 'streets' : 'dark', true);
+                  setShowMoreMenu(false);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
                   activeLayer === 'dark'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-300 hover:bg-slate-800'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-slate-300 hover:bg-slate-900'
                 }`}
               >
-                <Box className="w-4 h-4 text-indigo-400" />
-                <span>🌙 Tô Passando Noturno Suave</span>
+                <span className="text-sm">🌙</span>
+                <span>{activeLayer === 'dark' ? 'Modo Noturno (Ativo)' : 'Ativar Modo Noturno'}</span>
               </button>
+
+              {/* Cockpit 3D */}
+              <button
+                onClick={() => {
+                  setIs3DMode(!is3DMode);
+                  setShowMoreMenu(false);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
+                  is3DMode
+                    ? 'bg-lime-400 text-slate-950 shadow-md font-black'
+                    : 'text-slate-300 hover:bg-slate-900'
+                }`}
+              >
+                <Box className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>{is3DMode ? 'Visão Cockpit 3D (Ativa)' : 'Ativar Visão Cockpit 3D'}</span>
+              </button>
+
+              {/* Despoluir Mapa */}
+              <button
+                onClick={() => {
+                  setIsDeclutterActive(!isDeclutterActive);
+                  setShowMoreMenu(false);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
+                  isDeclutterActive
+                    ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                    : 'text-slate-300 hover:bg-slate-900'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
+                <span>{isDeclutterActive ? '✨ Mapa Despoluído (Ativo)' : '🧹 Despoluir Mapa'}</span>
+              </button>
+
+              {/* Marcar Local com Foto */}
+              {onOpenPhotoIncident && (
+                <button
+                  onClick={() => {
+                    onOpenPhotoIncident(tappedMapCoords || currentLocation);
+                    setShowMoreMenu(false);
+                  }}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-300 bg-rose-950/30 hover:bg-rose-900/40 border border-rose-500/30 transition-all text-left cursor-pointer"
+                >
+                  <Camera className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>📸 Marcar Ocorrência / Foto</span>
+                </button>
+              )}
+
+              {/* Ver Rota Completa (se rota ativa) */}
+              {selectedRoute && (
+                <button
+                  onClick={() => {
+                    handleFitRoute();
+                    setShowMoreMenu(false);
+                  }}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-cyan-300 hover:bg-slate-900 transition-all text-left cursor-pointer"
+                >
+                  <Eye className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>👁️ Ver Rota Completa</span>
+                </button>
+              )}
+
+              {/* Seletor de Camadas Cartográficas */}
+              <div className="pt-1.5 border-t border-slate-800">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 px-1 pb-1 block">
+                  Camada Base
+                </span>
+                <div className="grid grid-cols-2 gap-1 text-[11px]">
+                  <button
+                    onClick={() => { switchLayer('streets', true); setShowMoreMenu(false); }}
+                    className={`p-1.5 rounded-lg font-bold flex items-center justify-center gap-1 cursor-pointer ${
+                      activeLayer === 'streets' ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>🧭 Ruas</span>
+                  </button>
+                  <button
+                    onClick={() => { switchLayer('satellite', true); setShowMoreMenu(false); }}
+                    className={`p-1.5 rounded-lg font-bold flex items-center justify-center gap-1 cursor-pointer ${
+                      activeLayer === 'satellite' ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>🛰️ Satélite</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Controles de Zoom */}
+              <div className="flex items-center justify-between pt-1.5 border-t border-slate-800 px-1">
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Zoom</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleZoomIn}
+                    className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 cursor-pointer"
+                    title="Aproximar Zoom"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleZoomOut}
+                    className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 cursor-pointer"
+                    title="Afastar Zoom"
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
-        </div>
-
-        {selectedRoute && (
-          <button
-            onClick={handleFitRoute}
-            className="p-3 bg-slate-900/90 hover:bg-slate-800 text-blue-400 rounded-xl shadow-xl border border-slate-700/80 backdrop-blur-md active:scale-95 transition-all"
-            title="Ver Rota Completa"
-          >
-            <Eye className="w-5 h-5" />
-          </button>
-        )}
-
-        {/* Zoom Controls */}
-        <div className="flex flex-col bg-slate-900/90 rounded-xl border border-slate-700/80 shadow-xl backdrop-blur-md overflow-hidden">
-          <button
-            onClick={handleZoomIn}
-            className="p-2.5 text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors border-b border-slate-800"
-            title="Aproximar"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleZoomOut}
-            className="p-2.5 text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors"
-            title="Afastar"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
       {/* Technological Cockpit Telemetry HUD Widget (Speedometer + Regulatory Speed Limit Sign + Gyro Compass Rose + RTK Precision) */}
-      <div className="absolute bottom-20 sm:bottom-4 left-3 z-20 flex flex-col gap-1.5 pointer-events-auto select-none">
+      {!isNavigating && (
+        <div className="absolute bottom-20 sm:bottom-4 left-3 z-20 flex flex-col gap-1.5 pointer-events-auto select-none">
         {/* Upper Telemetry Bar: Speedometer + Regulatory Speed Limit Sign + Gyro Compass */}
         <div className="flex items-center gap-2 bg-slate-950/90 backdrop-blur-xl border border-cyan-500/40 rounded-2xl p-2 shadow-2xl shadow-black/80">
           {/* Digital Speedometer Gauge */}
@@ -2061,7 +2106,8 @@ export const GPSMap: React.FC<GPSMapProps> = ({
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
