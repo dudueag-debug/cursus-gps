@@ -11,7 +11,9 @@ import {
   LogOut, 
   Trash2, 
   Sparkles,
-  Play
+  Play,
+  Route,
+  Clock
 } from 'lucide-react';
 import type { UserProfile, VehicleModel, VehicleColor, TransportMode } from '../../types';
 import { userService } from '../../services/userService';
@@ -35,10 +37,15 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isPlayingTestVoice, setIsPlayingTestVoice] = useState(false);
+  const [savedRoutes, setSavedRoutes] = useState<any[]>([]);
 
   useEffect(() => {
     setProfile(user);
-  }, [user]);
+    if (user?.id) {
+      const data = userService.getUserPrivateData(user.id);
+      setSavedRoutes(data.routeHistory || []);
+    }
+  }, [user, isOpen]);
 
   // Load browser voices
   useEffect(() => {
@@ -107,9 +114,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  const handleDeleteRouteItem = (historyId: string) => {
+    userService.deleteRouteHistoryItem(profile.id, historyId);
+    setSavedRoutes(prev => prev.filter(r => r.id !== historyId));
+  };
+
   const handleClearHistory = () => {
-    if (confirm('Deseja realmente limpar seu histórico local de destinos gravados?')) {
+    if (confirm('Deseja realmente limpar seu histórico de rotas gravadas?')) {
+      userService.clearRouteHistory(profile.id);
       localStorage.removeItem('tp_recent_searches');
+      setSavedRoutes([]);
       alert('Histórico de rotas limpo com sucesso.');
     }
   };
@@ -335,6 +349,75 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             />
             <span>Instruções de navegação em voz alta ativas</span>
           </label>
+        </div>
+
+        {/* Histórico de Rotas Finalizadas (Quilometragem e Tempo Gravados) */}
+        <div className="flex flex-col gap-2.5 bg-slate-950/70 border border-slate-800/90 rounded-2xl p-3.5 text-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Route className="w-4 h-4 text-cyan-400" />
+              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-200">
+                Histórico de Rotas Finalizadas ({savedRoutes.length})
+              </h3>
+            </div>
+            {savedRoutes.length > 0 && (
+              <span className="text-[10px] text-lime-400 font-mono font-bold bg-lime-950/40 border border-lime-500/30 px-2 py-0.5 rounded-full">
+                Gravado em Tempo Real
+              </span>
+            )}
+          </div>
+
+          {savedRoutes.length === 0 ? (
+            <div className="py-3 px-2 text-center text-slate-400 text-[11px] bg-slate-900/40 rounded-xl border border-slate-800/50">
+              Nenhuma rota finalizada gravada ainda. Ao concluir uma navegação no mapa, a quilometragem exata e a duração ficarão registradas aqui.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+              {savedRoutes.slice(0, 10).map((item, idx) => {
+                const km = (item.distanceMeters / 1000).toFixed(1);
+                const displayDist = item.distanceMeters >= 1000 ? `${km} km` : `${item.distanceMeters} m`;
+                const mins = Math.round(item.durationSeconds / 60);
+                const dateStr = new Date(item.timestamp).toLocaleDateString('pt-BR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+
+                return (
+                  <div 
+                    key={item.id || idx}
+                    className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-2 text-slate-200 hover:border-slate-700 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-white line-clamp-1">
+                        <span className="text-cyan-400 shrink-0">📍</span>
+                        <span className="truncate">{item.originName || 'Origem'}</span>
+                        <span className="text-slate-500 shrink-0">➔</span>
+                        <span className="text-lime-400 shrink-0">🏁</span>
+                        <span className="truncate">{item.destName || 'Destino'}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px] text-slate-400 mt-1 font-mono">
+                        <span className="text-cyan-300 font-bold">📏 {displayDist}</span>
+                        <span>•</span>
+                        <span className="text-amber-300 font-bold">⏱️ {mins} min</span>
+                        <span>•</span>
+                        <span>{dateStr}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleDeleteRouteItem(item.id)}
+                      className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors shrink-0"
+                      title="Excluir rota do histórico"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Privacy & LGPD */}

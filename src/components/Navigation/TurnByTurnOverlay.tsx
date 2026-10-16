@@ -36,7 +36,7 @@ export const TurnByTurnOverlay: React.FC<TurnByTurnOverlayProps> = ({
   onExitNavigation,
   enableVoice: initialEnableVoice,
   isRecalculating = false,
-  liveSpeedKmh = 48,
+  liveSpeedKmh = 0,
   remainingDistanceMeters,
   currentStreetName,
   rerouteOpportunity,
@@ -46,7 +46,7 @@ export const TurnByTurnOverlay: React.FC<TurnByTurnOverlayProps> = ({
   providerName = 'OSRM Open Cartography (Brasil)',
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [speed, setSpeed] = useState(liveSpeedKmh || 48);
+  const speed = Math.round(liveSpeedKmh && liveSpeedKmh > 0 ? liveSpeedKmh : 0);
   const [voiceActive, setVoiceActive] = useState(initialEnableVoice);
 
   const step = route.steps[currentStepIndex] || route.steps[0] || {

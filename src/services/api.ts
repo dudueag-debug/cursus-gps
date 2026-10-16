@@ -1,5 +1,6 @@
 import type { GeocodeResult, RouteOption, Occurrence, Place, CultureSpot, TransportMode, OccurrenceMessage, Coordinates } from '../types';
 import { RoutingManager } from './routingProviderService';
+import { getOfficialRioOccurrences } from '../data/rioOfficialRadars';
 
 const API_BASE = '/api';
 
@@ -766,8 +767,20 @@ export const api = {
       confidenceScore: 98,
     });
 
-    // Official persistent verified cameras (fixed physical infrastructure)
-    const combined = [...userReported, ...autoRioEvents, ...initialOccurrences];
+    // Official CET-RIO, Inmetro, PRF and Lei Seca Real Fixed & Operational Data
+    const officialRioData = getOfficialRioOccurrences();
+
+    // Combine community reports, live detected Rio events, official radars/police, and base occurrences
+    const allCandidates = [...userReported, ...officialRioData, ...autoRioEvents, ...initialOccurrences];
+    
+    // Deduplicate by id preserving priority (user-reported and official over fallbacks)
+    const uniqueMap = new Map<string, Occurrence>();
+    for (const occ of allCandidates) {
+      if (!uniqueMap.has(occ.id)) {
+        uniqueMap.set(occ.id, occ);
+      }
+    }
+    const combined = Array.from(uniqueMap.values());
 
     // Merge backend server occurrences if available
     const data = await safeJsonFetch(`${API_BASE}/occurrences`);

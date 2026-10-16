@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrandHeader } from './components/BrandHeader';
 import { GPSMap } from './components/Map/GPSMap';
 import { RoutePlanner } from './components/Navigation/RoutePlanner';
 import { TurnByTurnOverlay } from './components/Navigation/TurnByTurnOverlay';
+import { RotaFinalizadaModal, type CompletedTripData } from './components/Panels/RotaFinalizadaModal';
 import { CentralDeLocais } from './components/Panels/CentralDeLocais';
 import { AcontecendoNaVia } from './components/Panels/AcontecendoNaVia';
 import { PartidaSeguraModal } from './components/Panels/PartidaSeguraModal';
@@ -33,7 +34,7 @@ import type { BrazilTouristSpot } from './data/brazilTouristCatalog';
 import { AIPredictionEngine, type RerouteOpportunity } from './engines/aiPredictionEngine';
 import { useVoiceCommander } from './hooks/useVoiceCommander';
 import type { UserProfile, Coordinates, RouteOption, Occurrence, CultureSpot, Place, PlaceCategory, WeatherData } from './types';
-import { api } from './services/api';
+import { api, getDistanceMeters } from './services/api';
 import { locationService } from './services/locationService';
 import { userService } from './services/userService';
 import { weatherService } from './services/weatherService';
@@ -175,6 +176,34 @@ export function App() {
   const [currentStreetName, setCurrentStreetName] = useState('Via Principal');
   const [remainingDistanceMeters, setRemainingDistanceMeters] = useState<number | undefined>(undefined);
   const [rerouteOpportunity, setRerouteOpportunity] = useState<RerouteOpportunity | null>(null);
+
+  // Completed Trip Summary Modal & Telemetry Recording State
+  const [isRotaFinalizadaOpen, setIsRotaFinalizadaOpen] = useState(false);
+  const [completedTripData, setCompletedTripData] = useState<CompletedTripData | null>(null);
+
+  // Active Trip Telemetry Recording Ref
+  const tripTrackingRef = useRef<{
+    startTime: number;
+    totalDistanceMeters: number;
+    lastCoord: Coordinates | null;
+    maxSpeedKmh: number;
+    speedSamples: number[];
+    originName: string;
+    destName: string;
+  }>({
+    startTime: 0,
+    totalDistanceMeters: 0,
+    lastCoord: null,
+    maxSpeedKmh: 0,
+    speedSamples: [],
+    originName: '',
+    destName: '',
+  });
+
+  // GPS timestamp & delta displacement calculation ref
+  const lastGpsSampleRef = useRef<{ lat: number; lng: number; time: number } | null>(null);
+  const isNavigatingRef = useRef(false);
+  const selectedRouteRef = useRef<RouteOption | null>(null);
 
   // Realtime Notification Toast (Supabase Realtime)
   const [realtimeToast, setRealtimeToast] = useState<{ message: string; visible: boolean } | null>(null);
@@ -395,19 +424,56 @@ export function App() {
               if (pos.coords.accuracy) {
                 setGpsAccuracy(Math.round(pos.coords.accuracy));
               }
+              // 1. Precise Real-Time Speedometer calculation
+              const now = Date.now();
+              let computedSpeedKmh = 0;
+
               if (pos.coords.speed !== null && !isNaN(pos.coords.speed) && pos.coords.speed >= 0) {
-                setLiveSpeedKmh(Math.round(pos.coords.speed * 3.6));
+                computedSpeedKmh = Math.round(pos.coords.speed * 3.6);
+              } else if (lastGpsSampleRef.current) {
+                const distMovedMeters = getDistanceMeters(lastGpsSampleRef.current, newCoords);
+                const dtSec = (now - lastGpsSampleRef.current.time) / 1000;
+                if (dtSec >= 0.8 && dtSec <= 15) {
+                  if (distMovedMeters < 1.5) {
+                    computedSpeedKmh = 0;
+                  } else {
+                    const rawKmh = (distMovedMeters / dtSec) * 3.6;
+                    if (rawKmh <= 220) {
+                      computedSpeedKmh = Math.round(rawKmh);
+                    }
+                  }
+                }
               }
+              setLiveSpeedKmh(computedSpeedKmh);
+              lastGpsSampleRef.current = { lat, lng, time: now };
+
               if (
                 pos.coords.heading !== null &&
                 !isNaN(pos.coords.heading) &&
-                (pos.coords.speed || 0) > 0.5
+                computedSpeedKmh > 2
               ) {
                 setHeading(pos.coords.heading);
               }
 
+              // 2. Active Navigation Trip Distance & Speed Telemetry Accumulator
+              if (isNavigatingRef.current) {
+                if (tripTrackingRef.current.lastCoord) {
+                  const moved = getDistanceMeters(tripTrackingRef.current.lastCoord, newCoords);
+                  if (moved >= 2 && moved < 400) {
+                    tripTrackingRef.current.totalDistanceMeters += moved;
+                  }
+                }
+                tripTrackingRef.current.lastCoord = newCoords;
+
+                if (computedSpeedKmh > 0) {
+                  if (computedSpeedKmh > tripTrackingRef.current.maxSpeedKmh) {
+                    tripTrackingRef.current.maxSpeedKmh = computedSpeedKmh;
+                  }
+                  tripTrackingRef.current.speedSamples.push(computedSpeedKmh);
+                }
+              }
+
               // Throttle reverse geocoding to once every 20 seconds
-              const now = Date.now();
               if (now - lastReverseTime > 20000 || lastReverseTime === 0) {
                 lastReverseTime = now;
                 locationService.reverseGeocode(newCoords).then(rev => {
@@ -527,6 +593,15 @@ export function App() {
 
   const selectedRoute = routes[selectedRouteIndex] || null;
 
+  // Keep refs in sync for asynchronous geolocation callbacks
+  useEffect(() => {
+    isNavigatingRef.current = isNavigating;
+  }, [isNavigating]);
+
+  useEffect(() => {
+    selectedRouteRef.current = selectedRoute;
+  }, [selectedRoute]);
+
   // Active Map Matching and Off-Route Detection during Navigation
   useEffect(() => {
     if (!isNavigating || !selectedRoute) return;
@@ -534,6 +609,13 @@ export function App() {
     const match = MapMatchingService.matchPosition(currentLocation, selectedRoute);
     if (match.streetName) setCurrentStreetName(match.streetName);
     setRemainingDistanceMeters(match.remainingDistanceMeters);
+
+    // Destination arrival check (< 20m)
+    if (match.remainingDistanceMeters !== undefined && match.remainingDistanceMeters <= 20) {
+      speakText('Você chegou ao seu destino! Rota concluída com sucesso.');
+      handleExitNavigation();
+      return;
+    }
 
     if (match.needsRecalculation && !isRecalculating) {
       handleOffRouteRecalculate();
@@ -632,13 +714,16 @@ export function App() {
       return;
     }
 
-    userService.addRouteToUserHistory(
-      user.id,
-      detectedLocationName || 'Minha Localização',
-      selectedRoute.title || 'Destino GPS 4.0',
-      selectedRoute.totalDistanceMeters,
-      selectedRoute.totalDurationSeconds
-    );
+    // Initialize real trip telemetry tracking accumulator
+    tripTrackingRef.current = {
+      startTime: Date.now(),
+      totalDistanceMeters: 0,
+      lastCoord: currentLocation,
+      maxSpeedKmh: 0,
+      speedSamples: [],
+      originName: detectedLocationName || 'Minha Localização',
+      destName: selectedRoute.title || 'Destino GPS 4.0',
+    };
 
     setIsNavigating(true);
     setActivePanel('map');
@@ -650,13 +735,15 @@ export function App() {
 
   const handleProceedFromSafety = () => {
     if (selectedRoute && !isNavigating) {
-      userService.addRouteToUserHistory(
-        user.id,
-        detectedLocationName || 'Minha Localização',
-        selectedRoute.title || 'Destino GPS 4.0',
-        selectedRoute.totalDistanceMeters,
-        selectedRoute.totalDurationSeconds
-      );
+      tripTrackingRef.current = {
+        startTime: Date.now(),
+        totalDistanceMeters: 0,
+        lastCoord: currentLocation,
+        maxSpeedKmh: 0,
+        speedSamples: [],
+        originName: detectedLocationName || 'Minha Localização',
+        destName: selectedRoute.title || 'Destino GPS 4.0',
+      };
     }
     setIsNavigating(true);
     setActivePanel('map');
@@ -670,6 +757,46 @@ export function App() {
     backgroundLocationService.releaseWakeLock();
     backgroundLocationService.stopBackgroundAudioBeacon();
     speakText('Navegação encerrada.');
+
+    // Calculate real recorded trip statistics
+    const now = Date.now();
+    const startTime = tripTrackingRef.current.startTime || (now - 60000);
+    const durationSeconds = Math.max(1, Math.round((now - startTime) / 1000));
+
+    // Determine actual km/m recorded (if driven, use GPS odometer; otherwise fallback to route distance)
+    const recordedDistanceMeters = tripTrackingRef.current.totalDistanceMeters > 50
+      ? Math.round(tripTrackingRef.current.totalDistanceMeters)
+      : (selectedRoute?.totalDistanceMeters || 0);
+
+    const avgSpeedKmh = tripTrackingRef.current.speedSamples.length > 0
+      ? Math.round(tripTrackingRef.current.speedSamples.reduce((a, b) => a + b, 0) / tripTrackingRef.current.speedSamples.length)
+      : (durationSeconds > 0 && recordedDistanceMeters > 0 ? Math.round((recordedDistanceMeters / durationSeconds) * 3.6) : 0);
+
+    const maxSpeedKmh = tripTrackingRef.current.maxSpeedKmh > 0
+      ? tripTrackingRef.current.maxSpeedKmh
+      : avgSpeedKmh;
+
+    const tripSummary: CompletedTripData = {
+      originName: tripTrackingRef.current.originName || detectedLocationName || 'Minha Localização',
+      destName: tripTrackingRef.current.destName || selectedRoute?.title || 'Destino GPS 4.0',
+      distanceMeters: recordedDistanceMeters,
+      durationSeconds: durationSeconds,
+      avgSpeedKmh: avgSpeedKmh,
+      maxSpeedKmh: maxSpeedKmh,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Save route to user history with real distance and duration
+    userService.addRouteToUserHistory(
+      user.id,
+      tripSummary.originName,
+      tripSummary.destName,
+      tripSummary.distanceMeters,
+      tripSummary.durationSeconds
+    );
+
+    setCompletedTripData(tripSummary);
+    setIsRotaFinalizadaOpen(true);
   };
 
   // Choose vehicle from Minha Garagem (Requirement 4 & 5)
@@ -1308,6 +1435,14 @@ export function App() {
         onClose={() => setIsGaragemModalOpen(false)}
         user={user}
         onSelectCar={handleSelectClassicCar}
+      />
+
+      {/* Rota Finalizada & Resumo do Trajeto Modal */}
+      <RotaFinalizadaModal
+        isOpen={isRotaFinalizadaOpen}
+        onClose={() => setIsRotaFinalizadaOpen(false)}
+        tripData={completedTripData}
+        onViewHistory={() => setIsProfileModalOpen(true)}
       />
     </div>
   );

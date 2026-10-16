@@ -178,7 +178,7 @@ export const GPSMap: React.FC<GPSMapProps> = ({
   );
 
   const radarDistance = nearbyRadar ? Math.round(calcDistanceMeters(currentLocation, nearbyRadar.coordinates)) : 0;
-  const currentSpeed = liveSpeedKmh && liveSpeedKmh > 0 ? liveSpeedKmh : (isNavigating ? 48 : 0);
+  const currentSpeed = Math.round(liveSpeedKmh && liveSpeedKmh > 0 ? liveSpeedKmh : 0);
   const radarSpeedLimit = nearbyRadar?.speedLimitKmh || 60;
   const isOverSpeed = nearbyRadar ? currentSpeed > radarSpeedLimit : false;
 

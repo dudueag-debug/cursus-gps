@@ -159,6 +159,15 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
               <span>🛣️ Traçar Rota & Destino (3 Modos)</span>
             </button>
 
+            {/* Histórico de Rotas Gravadas */}
+            <button
+              onClick={() => { onOpenProfile(); onClose(); }}
+              className="w-full p-2.5 rounded-xl hover:bg-emerald-950/40 flex items-center gap-3 text-left transition-colors text-emerald-300 font-bold bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 shadow-sm"
+            >
+              <RouteIcon className="w-4 h-4 text-emerald-400" />
+              <span>🏁 Histórico de Rotas Gravadas (Km & Tempo)</span>
+            </button>
+
             {/* Minha Garagem Clássica (Fusca, Opala, Chevette, Gol quadrado...) */}
             {onOpenGaragem && (
               <button
